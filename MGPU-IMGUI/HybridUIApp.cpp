@@ -20,26 +20,38 @@ HybridUIApp::HybridUIApp(const HINSTANCE hInstance): D3DApp(hInstance)
     mSceneBounds.Radius = 200;
 }
 
-HybridUIApp::~HybridUIApp()
-{
-}
+HybridUIApp::~HybridUIApp()= default;
 
 void HybridUIApp::Update(const GameTimer& gt)
-{
+{   
+    
     const UINT olderIndex = currentFrameResourceIndex - 1 > globalCountFrameResources
                                 ? 0
                                 : static_cast<UINT>(currentFrameResourceIndex);
     primeGPURenderingTime = primeDevice->GetCommandQueue()->GetTimestamp(olderIndex);
     secondGPURenderingTime = secondDevice->GetCommandQueue()->GetTimestamp(olderIndex);
 
-    const auto commandQueue = primeDevice->GetCommandQueue(GQueueType::Graphics);
+    const auto primeQueue = primeDevice->GetCommandQueue(GQueueType::Graphics);
+    const auto secondQueue = secondDevice->GetCommandQueue(GQueueType::Graphics);
 
     currentFrameResource = frameResources[currentFrameResourceIndex];
 
-    if (currentFrameResource->PrimeRenderFenceValue != 0 && !commandQueue->IsFinish(
+    if (currentFrameResource->PrimeRenderFenceValue != 0 && !primeQueue->IsFinish(
         currentFrameResource->PrimeRenderFenceValue))
     {
-        commandQueue->WaitForFenceValue(currentFrameResource->PrimeRenderFenceValue);
+        primeQueue->WaitForFenceValue(currentFrameResource->PrimeRenderFenceValue);
+    }
+
+    if (currentFrameResource->PrimeCopyFenceValue != 0 && !primeQueue->IsFinish(
+        currentFrameResource->PrimeCopyFenceValue))
+    {
+        primeQueue->WaitForFenceValue(currentFrameResource->PrimeCopyFenceValue);
+    }
+
+    if (currentFrameResource->SecondRenderFenceValue != 0 && !secondQueue->IsFinish(
+        currentFrameResource->SecondRenderFenceValue))
+    {
+        secondQueue->WaitForFenceValue(currentFrameResource->PrimeRenderFenceValue);
     }
 
     mLightRotationAngle += 0.1f * gt.DeltaTime();
@@ -58,16 +70,16 @@ void HybridUIApp::Update(const GameTimer& gt)
     }
 
     UpdateMaterials();
-
     UpdateShadowTransform(gt);
     UpdateMainPassCB(gt);
     UpdateShadowPassCB(gt);
     UpdateSsaoCB(gt);
 }
 
-void HybridUIApp::PopulateShadowMapCommands(std::shared_ptr<GCommandList> cmdList)
+void HybridUIApp::PopulateShadowMapCommands(const std::shared_ptr<GCommandList>& cmdList)
 {
     //cmdList->SetRootSignature(*primeDeviceSignature.get());
+    cmdList->SetPipelineState(*defaultPrimePipelineResources.GetPSO(RenderMode::ShadowMapOpaque));
     cmdList->SetRootShaderResourceView(StandardShaderSlot::MaterialData,
                                        *currentFrameResource->MaterialBuffer, 1);
     cmdList->SetRootDescriptorTable(StandardShaderSlot::TexturesMap, &srvTexturesMemory);
@@ -76,7 +88,7 @@ void HybridUIApp::PopulateShadowMapCommands(std::shared_ptr<GCommandList> cmdLis
 
     shadowPath->PopulatePreRenderCommands(cmdList);
 
-    cmdList->SetPipelineState(*defaultPrimePipelineResources.GetPSO(RenderMode::ShadowMapOpaque));
+    
     PopulateDrawCommands(cmdList, RenderMode::Opaque);
     PopulateDrawCommands(cmdList, RenderMode::OpaqueAlphaDrop);
 
@@ -88,6 +100,7 @@ void HybridUIApp::PopulateNormalMapCommands(const std::shared_ptr<GCommandList>&
 {
     //Draw Normals
     {
+        cmdList->SetPipelineState(*defaultPrimePipelineResources.GetPSO(RenderMode::DrawNormalsOpaque));
         cmdList->SetDescriptorsHeap(&srvTexturesMemory);
         //cmdList->SetRootSignature(*primeDeviceSignature.get());
         cmdList->SetRootShaderResourceView(StandardShaderSlot::MaterialData,
@@ -125,7 +138,7 @@ void HybridUIApp::PopulateNormalMapCommands(const std::shared_ptr<GCommandList>&
     }
 }
 
-void HybridUIApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandList>& cmdList)
+void HybridUIApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandList>& cmdList) const
 {
     //Draw Ambient
     {
@@ -191,8 +204,8 @@ void HybridUIApp::PopulateForwardPathCommands(const std::shared_ptr<GCommandList
     }
 }
 
-void HybridUIApp::PopulateDrawCommands(std::shared_ptr<GCommandList> cmdList,
-                                         RenderMode type)
+void HybridUIApp::PopulateDrawCommands(const std::shared_ptr<GCommandList>& cmdList,
+                                         RenderMode type) const
 {
     for (auto&& renderer : typedRenderer[(int)type])
     {
@@ -200,8 +213,8 @@ void HybridUIApp::PopulateDrawCommands(std::shared_ptr<GCommandList> cmdList,
     }
 }
 
-void HybridUIApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& cmdList, GTexture& renderTarget,
-                                             GDescriptor* rtvMemory, const UINT offsetRTV)
+void HybridUIApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& cmdList, const GTexture& renderTarget,
+                                             const GDescriptor* rtvMemory, const UINT offsetRTV) const
 {
     cmdList->SetViewports(&fullViewport, 1);
     cmdList->SetScissorRects(&fullRect, 1);
@@ -214,8 +227,8 @@ void HybridUIApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& 
 }
 
 void HybridUIApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
-                                                GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
-                                                GraphicPSO& pso)
+                                                const GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
+                                                const GraphicPSO& pso) const
 {
     cmdList->SetRootDescriptorTable(StandardShaderSlot::AmbientMap, renderTextureSRVMemory, renderTextureMemoryOffset);
 
@@ -569,6 +582,7 @@ void HybridUIApp::InitRenderPaths()
     antiAliasingPrimePath->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
 
     commandQueue->WaitForFenceValue(commandQueue->ExecuteCommandList(cmdList));
+    commandQueue->Flush();
 
     logQueue.Push(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
 
@@ -595,7 +609,7 @@ void HybridUIApp::InitRenderPaths()
 
 void HybridUIApp::LoadStudyTexture()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
 
     const auto cmdList = queue->GetCommandList();
 
@@ -658,13 +672,13 @@ void HybridUIApp::LoadStudyTexture()
     }
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
-
+    queue->Flush();
     logQueue.Push(std::wstring(L"\nLoad DDS Texture"));
 }
 
 void HybridUIApp::LoadModels()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
     auto cmdList = queue->GetCommandList();
 
     auto nano = assets->CreateModelFromFile(cmdList, "Data\\Objects\\Nanosuit\\Nanosuit.obj");
@@ -715,8 +729,7 @@ void HybridUIApp::LoadModels()
     models[L"doom"] = std::move(doom);
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
-    queue->Flush();
-
+    primeDevice->Flush();
     logQueue.Push(std::wstring(L"\nLoad Models Data"));
 }
 
@@ -754,7 +767,7 @@ void HybridUIApp::MipMasGenerate()
             computeList->FlushResourceBarriers();
             logQueue.Push(std::wstring(L"\nTexture Barrier Generation for " + primeDevice->GetName()));
             computeQueue->WaitForFenceValue(computeQueue->ExecuteCommandList(computeList));
-
+            computeQueue->Flush();
             logQueue.Push(std::wstring(L"\nMipMap Generation cmd list executing " + primeDevice->GetName()));
             for (auto&& pair : textures)
                 pair->ClearTrack();
@@ -969,8 +982,10 @@ void HybridUIApp::CreateGO()
     logQueue.Push(std::wstring(L"\nFinish create GO"));
 }
 
+static constexpr int StatisticStepSecondsCount = 60;
+
 void HybridUIApp::CalculateFrameStats()
-{
+{    
     static float minFps = std::numeric_limits<float>::max();
     static float minMspf = std::numeric_limits<float>::max();
     static float maxFps = std::numeric_limits<float>::min();
@@ -997,7 +1012,7 @@ void HybridUIApp::CalculateFrameStats()
         secondGPUTimeMin = std::min(secondGPURenderingTime, secondGPUTimeMin);
         secondGPUTimeMax = std::max(secondGPURenderingTime, secondGPUTimeMax);
 
-
+        
         if (writeStaticticCount >= StatisticStepSecondsCount)
         {
             const std::wstring staticticStr =
@@ -1012,18 +1027,6 @@ void HybridUIApp::CalculateFrameStats()
                 + L"\n\tMin Second GPU Rendering Time:" + std::to_wstring(secondGPUTimeMin);
 
             logQueue.Push(staticticStr);
-
-            if (!IsUseSharedUI)
-            {
-                Flush();
-                UIPath->ChangeDevice(secondDevice);
-                IsUseSharedUI = true;
-            }
-            else
-            {
-                IsStop = true;
-            }
-
 
             writeStaticticCount = 0;
             minFps = std::numeric_limits<float>::max();
@@ -1131,7 +1134,7 @@ int HybridUIApp::Run()
     return static_cast<int>(msg.wParam);
 }
 
-void HybridUIApp::UpdateMaterials()
+void HybridUIApp::UpdateMaterials() const
 {
     {
         auto currentMaterialBuffer = currentFrameResource->MaterialBuffer;
@@ -1275,7 +1278,7 @@ void HybridUIApp::UpdateMainPassCB(const GameTimer& gt)
     currentPassCB->CopyData(0, mainPassCB);
 }
 
-void HybridUIApp::UpdateSsaoCB(const GameTimer& gt)
+void HybridUIApp::UpdateSsaoCB(const GameTimer& gt) const
 {
     SsaoConstants ssaoCB;
 
@@ -1392,6 +1395,49 @@ void HybridUIApp::Flush()
 LRESULT HybridUIApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wParam, const LPARAM lParam)
 {
     UIPath->MsgProc(hwnd, msg, wParam, lParam);
+
+    switch (msg)
+    {
+    case WM_KEYUP:
+        {
+            auto keycode = static_cast<char>(wParam);
+            keyboard.OnKeyReleased(keycode);
+            return 0;
+        }
+        
+    case WM_KEYDOWN:
+        {
+            auto keycode = static_cast<char>(wParam);
+            if (keyboard.IsKeysAutoRepeat())
+            {
+                keyboard.OnKeyPressed(keycode);
+            }
+            else
+            {
+                const bool wasPressed = lParam & 0x40000000;
+                if (!wasPressed)
+                {
+                    keyboard.OnKeyPressed(keycode);
+                }
+            }
+
+
+            if (keycode == (VK_SPACE) && keyboard.KeyIsPressed(VK_SPACE))
+            {
+                IsUseSharedUI = !IsUseSharedUI;
+                Flush();
+                UIPath->ChangeDevice(IsUseSharedUI ? secondDevice : primeDevice);
+            }
+
+            if (keycode == VK_ESCAPE && keyboard.KeyIsPressed(VK_ESCAPE))
+            {
+                Flush();
+                IsStop = true;
+            }
+            
+            return 0;
+        }
+    }
 
     return D3DApp::MsgProc(hwnd, msg, wParam, lParam);
 }

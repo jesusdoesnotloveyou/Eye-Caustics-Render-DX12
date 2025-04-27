@@ -101,37 +101,37 @@ void Mousepad::OnMouseMoveRaw(const int x, const int y)
     this->eventBuffer.push(MouseEvent(MouseEvent::EventType::RAW_MOVE, x, y));
 }
 
-bool Mousepad::IsLeftDown()
+bool Mousepad::IsLeftDown() const
 {
     return this->leftIsDown;
 }
 
-bool Mousepad::IsMiddleDown()
+bool Mousepad::IsMiddleDown() const
 {
     return this->mbuttonDown;
 }
 
-bool Mousepad::IsRightDown()
+bool Mousepad::IsRightDown() const
 {
     return this->rightIsDown;
 }
 
-int Mousepad::GetPosX()
+int Mousepad::GetPosX() const
 {
     return this->x;
 }
 
-int Mousepad::GetPosY()
+int Mousepad::GetPosY() const
 {
     return this->y;
 }
 
-MousePoint Mousepad::GetPos()
+MousePoint Mousepad::GetPos() const
 {
     return {this->x, this->y};
 }
 
-bool Mousepad::EventBufferIsEmpty()
+bool Mousepad::EventBufferIsEmpty() const
 {
     return this->eventBuffer.empty();
 }

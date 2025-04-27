@@ -36,9 +36,9 @@ namespace Common
         bool IsFullScreen() const;
         void SetFullscreen(bool fullscreen);
 
-        void Show();
+        void Show() const;
 
-        void Hide();
+        void Hide() const;
 
         UINT GetCurrentBackBufferIndex() const;
 

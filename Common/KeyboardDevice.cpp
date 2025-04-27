@@ -39,17 +39,17 @@ KeyboardDevice::KeyboardDevice()
         this->keyStates[i] = false; //Initialize all key states to off (false)
 }
 
-bool KeyboardDevice::KeyIsPressed(const unsigned char keycode)
+bool KeyboardDevice::KeyIsPressed(const unsigned char keycode) const
 {
     return this->keyStates[keycode];
 }
 
-bool KeyboardDevice::KeyBufferIsEmpty()
+bool KeyboardDevice::KeyBufferIsEmpty() const
 {
     return this->keyBuffer.empty();
 }
 
-bool KeyboardDevice::CharBufferIsEmpty()
+bool KeyboardDevice::CharBufferIsEmpty() const
 {
     return this->charBuffer.empty();
 }
@@ -113,12 +113,12 @@ void KeyboardDevice::DisableAutoRepeatChars()
     this->autoRepeatChars = false;
 }
 
-bool KeyboardDevice::IsKeysAutoRepeat()
+bool KeyboardDevice::IsKeysAutoRepeat() const
 {
     return this->autoRepeatKeys;
 }
 
-bool KeyboardDevice::IsCharsAutoRepeat()
+bool KeyboardDevice::IsCharsAutoRepeat() const
 {
     return this->autoRepeatChars;
 }

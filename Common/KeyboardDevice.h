@@ -33,9 +33,9 @@ class KeyboardDevice
 {
 public:
     KeyboardDevice();;
-    bool KeyIsPressed(unsigned char keycode);;
-    bool KeyBufferIsEmpty();;
-    bool CharBufferIsEmpty();;
+    bool KeyIsPressed(unsigned char keycode) const;;
+    bool KeyBufferIsEmpty() const;;
+    bool CharBufferIsEmpty() const;;
     KeyboardEvent ReadKey();;
     unsigned char ReadChar();;
     void OnKeyPressed(unsigned char key);;
@@ -45,8 +45,8 @@ public:
     void DisableAutoRepeatKeys();;
     void EnableAutoRepeatChars();;
     void DisableAutoRepeatChars();;
-    bool IsKeysAutoRepeat();;
-    bool IsCharsAutoRepeat();;
+    bool IsKeysAutoRepeat() const;;
+    bool IsCharsAutoRepeat() const;;
 
 private:
     bool autoRepeatKeys = false;

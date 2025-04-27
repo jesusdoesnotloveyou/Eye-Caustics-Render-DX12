@@ -55,7 +55,7 @@ GModel::GModel(const GModel& copy): model(copy.model)
 
 GModel::~GModel() = default;
 
-void GModel::Draw(const std::shared_ptr<GCommandList>& cmdList)
+void GModel::Draw(const std::shared_ptr<GCommandList>& cmdList) const
 {
     for (auto&& mesh : gmeshes)
     {

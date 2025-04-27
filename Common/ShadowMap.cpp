@@ -71,7 +71,7 @@ void ShadowMap::OnResize(const UINT newWidth, const UINT newHeight)
     }
 }
 
-void ShadowMap::PopulatePreRenderCommands(std::shared_ptr<GCommandList>& cmdList)
+void ShadowMap::PopulatePreRenderCommands(const std::shared_ptr<GCommandList>& cmdList) const
 {
     cmdList->SetViewports(&viewport, 1);
     cmdList->SetScissorRects(&scissorRect, 1);
@@ -83,7 +83,7 @@ void ShadowMap::PopulatePreRenderCommands(std::shared_ptr<GCommandList>& cmdList
                                D3D12_CLEAR_FLAG_DEPTH);
 }
 
-void ShadowMap::BuildViews()
+void ShadowMap::BuildViews() const
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

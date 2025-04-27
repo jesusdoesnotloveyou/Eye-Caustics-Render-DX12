@@ -82,7 +82,7 @@ void UILayer::ChangeDevice(const std::shared_ptr<GDevice>& device)
 }
 
 
-void UILayer::Render(const std::shared_ptr<GCommandList>& cmdList)
+void UILayer::Render(const std::shared_ptr<GCommandList>& cmdList) const
 {
     cmdList->SetDescriptorsHeap(&srvMemory);
 

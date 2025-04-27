@@ -41,7 +41,7 @@ public:
 
     ~GModel();
 
-    void Draw(const std::shared_ptr<GCommandList>& cmdList);
+    void Draw(const std::shared_ptr<GCommandList>& cmdList) const;
 
     std::shared_ptr<GModel> Dublicate(std::shared_ptr<GCommandList> otherDeviceCmdList) const;
 };

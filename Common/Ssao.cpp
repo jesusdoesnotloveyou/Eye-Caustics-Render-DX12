@@ -185,7 +185,7 @@ void SSAO::BuildDescriptors()
     RebuildDescriptors();
 }
 
-void SSAO::RebuildDescriptors()
+void SSAO::RebuildDescriptors() const
 {
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
@@ -295,7 +295,7 @@ void SSAO::ComputeSsao(
 }
 
 void SSAO::ClearAmbiantMap(
-    const std::shared_ptr<GCommandList>& cmdList)
+    const std::shared_ptr<GCommandList>& cmdList) const
 {
     cmdList->TransitionBarrier(ambientMap0, D3D12_RESOURCE_STATE_RENDER_TARGET);
     cmdList->FlushResourceBarriers();
@@ -322,7 +322,7 @@ void SSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList,
     }
 }
 
-void SSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const bool horzBlur)
+void SSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const bool horzBlur) const
 {
     GTexture output;
     size_t inputSrv;

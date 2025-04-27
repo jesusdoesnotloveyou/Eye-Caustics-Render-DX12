@@ -39,7 +39,7 @@ class Material
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuTextureHandle;
 
 public:
-    UINT GetMaterialIndex()
+    UINT GetMaterialIndex() const
     {
         return materialIndex;
     }
@@ -85,7 +85,7 @@ public:
 
     Material(std::wstring name, RenderMode pso = RenderMode::Opaque);
 
-    void InitMaterial(GDescriptor* textureHeap);
+    void InitMaterial(GDescriptor* textureHeap) const;
 
     void Update();
 

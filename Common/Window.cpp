@@ -130,12 +130,12 @@ namespace Common
     }
 
 
-    void Window::Show()
+    void Window::Show() const
     {
         ShowWindow(hWnd, SW_SHOW);
     }
 
-    void Window::Hide()
+    void Window::Hide() const
     {
         ShowWindow(hWnd, SW_HIDE);
     }

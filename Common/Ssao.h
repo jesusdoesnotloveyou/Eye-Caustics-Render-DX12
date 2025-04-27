@@ -48,7 +48,7 @@ public:
 
     void BuildDescriptors();
 
-    void RebuildDescriptors();
+    void RebuildDescriptors() const;
 
     void SetPipelineData(GraphicPSO& ssaoPso, GraphicPSO& ssaoBlurPso);
 
@@ -59,7 +59,7 @@ public:
         const std::shared_ptr<GCommandList>& cmdList,
         const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame,
         int blurCount);
-    void ClearAmbiantMap(const std::shared_ptr<GCommandList>& cmdList);
+    void ClearAmbiantMap(const std::shared_ptr<GCommandList>& cmdList) const;
 
 private:
     std::shared_ptr<GRootSignature> ssaoPrimeRootSignature;
@@ -67,7 +67,7 @@ private:
 
     void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList,
                         const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame, int blurCount);
-    void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, bool horzBlur);
+    void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, bool horzBlur) const;
     GTexture CreateNormalMap() const;
     GTexture CreateAmbientMap() const;
     GTexture CreateDepthMap() const;

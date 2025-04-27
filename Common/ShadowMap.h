@@ -29,10 +29,10 @@ public:
 
     void OnResize(UINT newWidth, UINT newHeight);
 
-    void PopulatePreRenderCommands(std::shared_ptr<GCommandList>& cmdList);
+    void PopulatePreRenderCommands(const std::shared_ptr<GCommandList>& cmdList) const;
 
 private:
-    void BuildViews();
+    void BuildViews() const;
     void BuildResource();
 
     std::shared_ptr<GDevice> device;
