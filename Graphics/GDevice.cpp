@@ -117,6 +117,14 @@ namespace PEPEngine::Graphics
         CloseHandle(handle);
     }
 
+    void GDevice::ReleaseSlateDescriptors(uint64_t frameCount) const
+    {
+        for (auto& allocator : graphicAllocators)
+        {
+            allocator->ReleaseStaleDescriptors(frameCount);
+        }
+    }
+
     void GDevice::InitialDescriptorAllocator()
     {
         auto Device = std::shared_ptr<GDevice>(this);
