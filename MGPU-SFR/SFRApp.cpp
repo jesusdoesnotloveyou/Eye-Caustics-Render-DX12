@@ -294,7 +294,7 @@ void SFRApp::InitRenderPaths()
 void SFRApp::LoadStudyTexture()
 {
     {
-        auto queue = devices[GraphicAdapterPrimary]->GetCommandQueue(GQueueType::Copy);
+        auto queue = devices[GraphicAdapterPrimary]->GetCommandQueue(GQueueType::Compute);
 
         auto cmdList = queue->GetCommandList();
 
@@ -364,7 +364,7 @@ void SFRApp::LoadStudyTexture()
 
 void SFRApp::LoadModels()
 {
-    auto queue = devices[GraphicAdapterPrimary]->GetCommandQueue(GQueueType::Copy);
+    auto queue = devices[GraphicAdapterPrimary]->GetCommandQueue(GQueueType::Compute);
     auto cmdList = queue->GetCommandList();
 
     auto nano = assets[GraphicAdapterPrimary].CreateModelFromFile(cmdList, "Data\\Objects\\Nanosuit\\Nanosuit.obj");
@@ -480,7 +480,7 @@ void SFRApp::DublicateResource()
         logQueue.Push(std::wstring(L"\nStart Dublicate Resource for " + devices[i]->GetName()));
         try
         {
-            auto queue = devices[i]->GetCommandQueue(GQueueType::Copy);
+            auto queue = devices[i]->GetCommandQueue(GQueueType::Compute);
             auto cmdList = queue->GetCommandList();
 
 

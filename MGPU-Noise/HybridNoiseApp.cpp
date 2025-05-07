@@ -227,7 +227,7 @@ void HybridNoiseApp::PopulateDrawCommands(const std::shared_ptr<GCommandList>& c
 }
 
 void HybridNoiseApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& cmdList, const GTexture& renderTarget,
-                                                const GDescriptor* rtvMemory, const UINT offsetRTV) const
+                                              const GDescriptor* rtvMemory, const UINT offsetRTV) const
 {
     cmdList->SetViewports(&fullViewport, 1);
     cmdList->SetScissorRects(&fullRect, 1);
@@ -240,8 +240,8 @@ void HybridNoiseApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList
 }
 
 void HybridNoiseApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
-                                                   const GDescriptor* renderTextureSRVMemory,
-                                                   const UINT renderTextureMemoryOffset, const GraphicPSO& pso)
+                                                 const GDescriptor* renderTextureSRVMemory,
+                                                 const UINT renderTextureMemoryOffset, const GraphicPSO& pso)
 {
     cmdList->SetRootSignature(*primeDeviceSignature.get());
     cmdList->SetDescriptorsHeap(renderTextureSRVMemory);
@@ -671,18 +671,28 @@ bool HybridNoiseApp::Initialize()
 
 
     LoadStudyTexture();
+    Flush();
     LoadModels();
+    Flush();
     CreateMaterials();
+    Flush();
     MipMasGenerate();
+    Flush();
 
     InitRenderPaths();
+    Flush();
     InitSRVMemoryAndMaterials();
+    Flush();
     InitRootSignature();
+    Flush();
     InitPipeLineResource();
+    Flush();
     CreateGO();
+    Flush();
     SortGO();
+    Flush();
     InitFrameResource();
-
+    Flush();
 
     OnResize();
 
@@ -938,7 +948,7 @@ void HybridNoiseApp::InitRenderPaths()
 
 void HybridNoiseApp::LoadStudyTexture()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    const auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
 
     const auto cmdList = queue->GetCommandList();
 
@@ -1007,7 +1017,7 @@ void HybridNoiseApp::LoadStudyTexture()
 
 void HybridNoiseApp::LoadModels()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
     const auto cmdList = queue->GetCommandList();
 
     auto nano = assets->CreateModelFromFile(cmdList, "Data\\Objects\\Nanosuit\\Nanosuit.obj");
@@ -1146,7 +1156,7 @@ void HybridNoiseApp::CreateGO()
                                                        assets->GetTextureIndex(L"skyTex"));
 
         skySphere->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::SkyBox].push_back((renderer));
+        typedRenderer[static_cast<int>(RenderMode::SkyBox)].push_back((renderer));
     }
     gameObjects.push_back(std::move(skySphere));
 
@@ -1156,8 +1166,8 @@ void HybridNoiseApp::CreateGO()
                                                         models[L"quad"]);
         renderer->SetModel(models[L"quad"]);
         quadRitem->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Debug].push_back(renderer);
-        typedRenderer[(int)RenderMode::Quad].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Debug)].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Quad)].push_back(renderer);
     }
     gameObjects.push_back(std::move(quadRitem));
 
@@ -1176,7 +1186,7 @@ void HybridNoiseApp::CreateGO()
         nano->GetTransform()->SetEulerRotate(Vector3(0, -90, 0));
         auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"nano"]);
         nano->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
         gameObjects.push_back(std::move(nano));
 
 
@@ -1186,7 +1196,7 @@ void HybridNoiseApp::CreateGO()
         doom->GetTransform()->SetEulerRotate(Vector3(0, 90, 0));
         renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"doom"]);
         doom->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
         gameObjects.push_back(std::move(doom));
     }
 
@@ -1199,7 +1209,7 @@ void HybridNoiseApp::CreateGO()
                 Vector3::Right * -60 + Vector3::Right * -30 * j + Vector3::Up * 11 + Vector3::Forward * 10 * i);
             auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"atlas"]);
             atlas->AddComponent(renderer);
-            typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+            typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
             gameObjects.push_back(std::move(atlas));
 
 
@@ -1208,7 +1218,7 @@ void HybridNoiseApp::CreateGO()
                 Vector3::Right * 130 + Vector3::Right * -30 * j + Vector3::Up * 11 + Vector3::Forward * 10 * i);
             renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"pbody"]);
             pbody->AddComponent(renderer);
-            typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+            typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
             gameObjects.push_back(std::move(pbody));
         }
     }
@@ -1217,7 +1227,7 @@ void HybridNoiseApp::CreateGO()
     particle->GetTransform()->SetPosition(Vector3::Up);
     const auto emitter = std::make_shared<ParticleEmitter>(primeDevice, 100000 * 0.06);
     particle->AddComponent(emitter);
-    typedRenderer[(int)RenderMode::Particle].push_back(emitter);
+    typedRenderer[static_cast<int>(RenderMode::Particle)].push_back(emitter);
     crossEmitter.push_back(emitter.get());
     gameObjects.push_back(std::move(particle));
 
@@ -1227,7 +1237,7 @@ void HybridNoiseApp::CreateGO()
     platform->GetTransform()->SetPosition(Vector3::Backward * -130);
     auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"platform"]);
     platform->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
 
     auto rotater = std::make_unique<GameObject>();
@@ -1262,7 +1272,7 @@ void HybridNoiseApp::CreateGO()
     stair->GetTransform()->SetPosition(Vector3::Left * 700);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"stair"]);
     stair->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
 
     auto columns = std::make_unique<GameObject>();
@@ -1272,7 +1282,7 @@ void HybridNoiseApp::CreateGO()
     columns->GetTransform()->SetPosition(Vector3::Up * 2000 + Vector3::Forward * 900);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"columns"]);
     columns->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
     auto fountain = std::make_unique<GameObject>();
     fountain->SetScale(0.005);
@@ -1280,7 +1290,7 @@ void HybridNoiseApp::CreateGO()
     fountain->GetTransform()->SetPosition(Vector3::Up * 35 + Vector3::Backward * 77);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"fountain"]);
     fountain->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
     gameObjects.push_back(std::move(platform));
     gameObjects.push_back(std::move(stair));
@@ -1293,7 +1303,7 @@ void HybridNoiseApp::CreateGO()
     mountDragon->GetTransform()->SetPosition(Vector3::Right * -960 + Vector3::Up * 45 + Vector3::Backward * 775);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"mountDragon"]);
     mountDragon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
     gameObjects.push_back(std::move(mountDragon));
 
 
@@ -1302,7 +1312,7 @@ void HybridNoiseApp::CreateGO()
     desertDragon->GetTransform()->SetPosition(Vector3::Right * 960 + Vector3::Up * -5 + Vector3::Backward * 775);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"desertDragon"]);
     desertDragon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
     gameObjects.push_back(std::move(desertDragon));
 
     auto griffon = std::make_unique<GameObject>();
@@ -1311,7 +1321,7 @@ void HybridNoiseApp::CreateGO()
     griffon->GetTransform()->SetPosition(Vector3::Right * -355 + Vector3::Up * -7 + Vector3::Backward * 17);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"griffon"]);
     griffon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::OpaqueAlphaDrop].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
     griffon = std::make_unique<GameObject>();
@@ -1320,7 +1330,7 @@ void HybridNoiseApp::CreateGO()
     griffon->GetTransform()->SetPosition(Vector3::Right * 355 + Vector3::Up * -7 + Vector3::Backward * 17);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"griffon"]);
     griffon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::OpaqueAlphaDrop].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
     logQueue.Push(std::wstring(L"\nFinish create GO"));

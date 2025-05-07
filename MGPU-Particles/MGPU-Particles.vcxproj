@@ -159,7 +159,7 @@
         <ClCompile Include="..\Submodule\imgui\imgui_tables.cpp"/>
         <ClCompile Include="..\Submodule\imgui\imgui_widgets.cpp"/>
         <ClCompile Include="FrameResource.cpp"/>
-        <ClCompile Include="HybridParticleApp.cpp" />
+        <ClCompile Include="HybridParticleApp.cpp"/>
         <ClCompile Include="Source.cpp"/>
     </ItemGroup>
     <ItemGroup>
@@ -188,7 +188,7 @@
         <ClInclude Include="..\Submodule\imgui\imstb_textedit.h"/>
         <ClInclude Include="..\Submodule\imgui\imstb_truetype.h"/>
         <ClInclude Include="FrameResource.h"/>
-        <ClInclude Include="HybridParticleApp.h" />
+        <ClInclude Include="HybridParticleApp.h"/>
     </ItemGroup>
     <ItemGroup>
         <None Include="packages.config"/>
@@ -345,18 +345,20 @@
     </ItemGroup>
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets"/>
     <ImportGroup Label="ExtensionTargets">
-        <Import Project="$(SolutionDir)\packages\directxmesh_uwp.2024.10.29.1\build\native\directxmesh_uwp.targets" Condition="Exists('$(SolutionDir)\packages\directxmesh_uwp.2024.10.29.1\build\native\directxmesh_uwp.targets')"/>
-        <Import Project="$(SolutionDir)\packages\directxtex_uwp.2024.10.29.1\build\native\directxtex_uwp.targets" Condition="Exists('$(SolutionDir)\packages\directxtex_uwp.2024.10.29.1\build\native\directxtex_uwp.targets')"/>
-        <Import Project="$(SolutionDir)\packages\directxtk12_uwp.2024.10.29.1\build\native\directxtk12_uwp.targets" Condition="Exists('$(SolutionDir)\packages\directxtk12_uwp.2024.10.29.1\build\native\directxtk12_uwp.targets')"/>
         <Import Project="$(SolutionDir)\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('$(SolutionDir)\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')"/>
+        <Import Project="..\packages\directxmesh_uwp.2025.3.25.2\build\native\directxmesh_uwp.targets" Condition="Exists('..\packages\directxmesh_uwp.2025.3.25.2\build\native\directxmesh_uwp.targets')"/>
+        <Import Project="..\packages\directxtex_uwp.2025.3.25.2\build\native\directxtex_uwp.targets" Condition="Exists('..\packages\directxtex_uwp.2025.3.25.2\build\native\directxtex_uwp.targets')"/>
+        <Import Project="..\packages\directxtk12_uwp.2025.3.21.3\build\native\directxtk12_uwp.targets" Condition="Exists('..\packages\directxtk12_uwp.2025.3.21.3\build\native\directxtk12_uwp.targets')"/>
+        <Import Project="..\packages\assimp-v143.5.4.3\build\native\assimp-v143.targets" Condition="Exists('..\packages\assimp-v143.5.4.3\build\native\assimp-v143.targets')"/>
     </ImportGroup>
     <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
         <PropertyGroup>
             <ErrorText>Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их. Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: {0}.</ErrorText>
         </PropertyGroup>
-        <Error Condition="!Exists('$(SolutionDir)\packages\directxmesh_uwp.2024.10.29.1\build\native\directxmesh_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\packages\directxmesh_uwp.2024.10.29.1\build\native\directxmesh_uwp.targets'))"/>
-        <Error Condition="!Exists('$(SolutionDir)\packages\directxtex_uwp.2024.10.29.1\build\native\directxtex_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\packages\directxtex_uwp.2024.10.29.1\build\native\directxtex_uwp.targets'))"/>
-        <Error Condition="!Exists('$(SolutionDir)\packages\directxtk12_uwp.2024.10.29.1\build\native\directxtk12_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\packages\directxtk12_uwp.2024.10.29.1\build\native\directxtk12_uwp.targets'))"/>
         <Error Condition="!Exists('$(SolutionDir)\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))"/>
+        <Error Condition="!Exists('..\packages\directxmesh_uwp.2025.3.25.2\build\native\directxmesh_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxmesh_uwp.2025.3.25.2\build\native\directxmesh_uwp.targets'))"/>
+        <Error Condition="!Exists('..\packages\directxtex_uwp.2025.3.25.2\build\native\directxtex_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_uwp.2025.3.25.2\build\native\directxtex_uwp.targets'))"/>
+        <Error Condition="!Exists('..\packages\directxtk12_uwp.2025.3.21.3\build\native\directxtk12_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtk12_uwp.2025.3.21.3\build\native\directxtk12_uwp.targets'))"/>
+        <Error Condition="!Exists('..\packages\assimp-v143.5.4.3\build\native\assimp-v143.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\assimp-v143.5.4.3\build\native\assimp-v143.targets'))"/>
     </Target>
 </Project>

@@ -121,25 +121,32 @@ namespace Common
         commandQueue->Flush();
         commandQueue->WaitForFenceValue(commandQueue->ExecuteCommandList(cmdList));
         GDeviceFactory::GetDevice()->Flush();
+        Flush();
         
         BuildTexturesHeap();
+        Flush();
         BuildShadersAndInputLayout();
+        Flush();
         BuildRootSignature();
+        Flush();
         BuildSsaoRootSignature();
+        Flush();
         BuildShapeGeometry();
+        Flush();
         BuildPSOs();
+        Flush();
         BuildMaterials();
+        Flush();
         BuildGameObjects();
+        Flush();
         BuildFrameResources();
+        Flush();
         SortGO();
-
+        Flush();
         ssao->SetPipelineData(*psos[RenderMode::Ssao], *psos[RenderMode::SsaoBlur]);
         loader.ClearTrackedObjects();
         
-        GDeviceFactory::GetDevice()->GetCommandQueue(GQueueType::Graphics)->SignalWithNewFenceValue(1000);
-        GDeviceFactory::GetDevice()->GetCommandQueue(GQueueType::Compute)->SignalWithNewFenceValue(1000);
-        GDeviceFactory::GetDevice()->GetCommandQueue(GQueueType::Copy)->SignalWithNewFenceValue(1000);
-        GDeviceFactory::GetDevice()->Flush();
+        Flush();
         
         return true;
     }
@@ -318,7 +325,6 @@ namespace Common
         {
             MainWindow->GetBackBuffer(i).CreateRenderTargetView(&rtvDesc, &renderTargetMemory, i);
         }
-
 
         if (camera != nullptr)
         {

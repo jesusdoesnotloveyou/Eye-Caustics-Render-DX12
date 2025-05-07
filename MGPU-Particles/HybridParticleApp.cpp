@@ -205,16 +205,16 @@ void HybridParticleApp::PopulateForwardPathCommands(const std::shared_ptr<GComma
 }
 
 void HybridParticleApp::PopulateDrawCommands(std::shared_ptr<GCommandList> cmdList,
-                                               RenderMode type)
+                                             RenderMode type)
 {
-    for (auto&& renderer : typedRenderer[(int)type])
+    for (auto&& renderer : typedRenderer[static_cast<int>(type)])
     {
         renderer->Draw(cmdList);
     }
 }
 
 void HybridParticleApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& cmdList, GTexture& renderTarget,
-                                                   GDescriptor* rtvMemory, const UINT offsetRTV)
+                                                 GDescriptor* rtvMemory, const UINT offsetRTV)
 {
     cmdList->SetViewports(&fullViewport, 1);
     cmdList->SetScissorRects(&fullRect, 1);
@@ -227,8 +227,8 @@ void HybridParticleApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandL
 }
 
 void HybridParticleApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
-                                                      GDescriptor* renderTextureSRVMemory,
-                                                      const UINT renderTextureMemoryOffset, GraphicPSO& pso)
+                                                    GDescriptor* renderTextureSRVMemory,
+                                                    const UINT renderTextureMemoryOffset, GraphicPSO& pso)
 {
     cmdList->SetRootSignature(*primeDeviceSignature.get());
     cmdList->SetDescriptorsHeap(renderTextureSRVMemory);
@@ -336,21 +336,31 @@ bool HybridParticleApp::Initialize()
 {
     InitDevices();
     InitMainWindow();
-
+    Flush();
 
     LoadStudyTexture();
+    Flush();
     LoadModels();
+    Flush();
     CreateMaterials();
+    Flush();
     MipMasGenerate();
+    Flush();
 
     InitRenderPaths();
+    Flush();
     InitSRVMemoryAndMaterials();
+    Flush();
     InitRootSignature();
+    Flush();
     InitPipeLineResource();
+    Flush();
     CreateGO();
+    Flush();
     SortGO();
+    Flush();
     InitFrameResource();
-
+    Flush();
 
     OnResize();
 
@@ -599,7 +609,7 @@ void HybridParticleApp::InitRenderPaths()
 
 void HybridParticleApp::LoadStudyTexture()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
 
     const auto cmdList = queue->GetCommandList();
 
@@ -668,7 +678,7 @@ void HybridParticleApp::LoadStudyTexture()
 
 void HybridParticleApp::LoadModels()
 {
-    auto queue = primeDevice->GetCommandQueue(GQueueType::Copy);
+    auto queue = primeDevice->GetCommandQueue(GQueueType::Compute);
     const auto cmdList = queue->GetCommandList();
 
     auto nano = assets->CreateModelFromFile(cmdList, "Data\\Objects\\Nanosuit\\Nanosuit.obj");
@@ -807,7 +817,7 @@ void HybridParticleApp::CreateGO()
                                                        assets->GetTextureIndex(L"skyTex"));
 
         skySphere->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::SkyBox].push_back((renderer));
+        typedRenderer[static_cast<int>(RenderMode::SkyBox)].push_back((renderer));
     }
     gameObjects.push_back(std::move(skySphere));
 
@@ -817,8 +827,8 @@ void HybridParticleApp::CreateGO()
                                                         models[L"quad"]);
         renderer->SetModel(models[L"quad"]);
         quadRitem->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Debug].push_back(renderer);
-        typedRenderer[(int)RenderMode::Quad].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Debug)].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Quad)].push_back(renderer);
     }
     gameObjects.push_back(std::move(quadRitem));
 
@@ -837,7 +847,7 @@ void HybridParticleApp::CreateGO()
         nano->GetTransform()->SetEulerRotate(Vector3(0, -90, 0));
         auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"nano"]);
         nano->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
         gameObjects.push_back(std::move(nano));
 
 
@@ -847,7 +857,7 @@ void HybridParticleApp::CreateGO()
         doom->GetTransform()->SetEulerRotate(Vector3(0, 90, 0));
         renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"doom"]);
         doom->AddComponent(renderer);
-        typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+        typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
         gameObjects.push_back(std::move(doom));
     }
 
@@ -860,7 +870,7 @@ void HybridParticleApp::CreateGO()
                 Vector3::Right * -60 + Vector3::Right * -30 * j + Vector3::Up * 11 + Vector3::Forward * 10 * i);
             auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"atlas"]);
             atlas->AddComponent(renderer);
-            typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+            typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
             gameObjects.push_back(std::move(atlas));
 
 
@@ -869,7 +879,7 @@ void HybridParticleApp::CreateGO()
                 Vector3::Right * 130 + Vector3::Right * -30 * j + Vector3::Up * 11 + Vector3::Forward * 10 * i);
             renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"pbody"]);
             pbody->AddComponent(renderer);
-            typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+            typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
             gameObjects.push_back(std::move(pbody));
         }
     }
@@ -878,7 +888,7 @@ void HybridParticleApp::CreateGO()
     particle->GetTransform()->SetPosition(Vector3::Up);
     const auto emitter = std::make_shared<CrossAdapterParticleEmitter>(primeDevice, secondDevice, 100000 * 1);
     particle->AddComponent(emitter);
-    typedRenderer[(int)RenderMode::Particle].push_back(emitter);
+    typedRenderer[static_cast<int>(RenderMode::Particle)].push_back(emitter);
     crossEmitter.push_back(emitter.get());
     gameObjects.push_back(std::move(particle));
 
@@ -888,7 +898,7 @@ void HybridParticleApp::CreateGO()
     platform->GetTransform()->SetPosition(Vector3::Backward * -130);
     auto renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"platform"]);
     platform->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
 
     auto rotater = std::make_unique<GameObject>();
@@ -915,7 +925,7 @@ void HybridParticleApp::CreateGO()
     stair->GetTransform()->SetPosition(Vector3::Left * 700);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"stair"]);
     stair->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
 
     auto columns = std::make_unique<GameObject>();
@@ -925,7 +935,7 @@ void HybridParticleApp::CreateGO()
     columns->GetTransform()->SetPosition(Vector3::Up * 2000 + Vector3::Forward * 900);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"columns"]);
     columns->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
     auto fountain = std::make_unique<GameObject>();
     fountain->SetScale(0.005);
@@ -933,7 +943,7 @@ void HybridParticleApp::CreateGO()
     fountain->GetTransform()->SetPosition(Vector3::Up * 35 + Vector3::Backward * 77);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"fountain"]);
     fountain->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
 
     gameObjects.push_back(std::move(platform));
     gameObjects.push_back(std::move(stair));
@@ -946,7 +956,7 @@ void HybridParticleApp::CreateGO()
     mountDragon->GetTransform()->SetPosition(Vector3::Right * -960 + Vector3::Up * 45 + Vector3::Backward * 775);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"mountDragon"]);
     mountDragon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
     gameObjects.push_back(std::move(mountDragon));
 
 
@@ -955,7 +965,7 @@ void HybridParticleApp::CreateGO()
     desertDragon->GetTransform()->SetPosition(Vector3::Right * 960 + Vector3::Up * -5 + Vector3::Backward * 775);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"desertDragon"]);
     desertDragon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::Opaque].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::Opaque)].push_back(renderer);
     gameObjects.push_back(std::move(desertDragon));
 
     auto griffon = std::make_unique<GameObject>();
@@ -964,7 +974,7 @@ void HybridParticleApp::CreateGO()
     griffon->GetTransform()->SetPosition(Vector3::Right * -355 + Vector3::Up * -7 + Vector3::Backward * 17);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"griffon"]);
     griffon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::OpaqueAlphaDrop].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
     griffon = std::make_unique<GameObject>();
@@ -973,7 +983,7 @@ void HybridParticleApp::CreateGO()
     griffon->GetTransform()->SetPosition(Vector3::Right * 355 + Vector3::Up * -7 + Vector3::Backward * 17);
     renderer = std::make_shared<ModelRenderer>(primeDevice, models[L"griffon"]);
     griffon->AddComponent(renderer);
-    typedRenderer[(int)RenderMode::OpaqueAlphaDrop].push_back(renderer);
+    typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
     logQueue.Push(std::wstring(L"\nFinish create GO"));

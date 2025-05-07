@@ -26,6 +26,22 @@ HybridShadowApp::HybridShadowApp(const HINSTANCE hInstance): D3DApp(hInstance), 
     mSceneBounds.Radius = 200;
 }
 
+HybridShadowApp::~HybridShadowApp()
+{
+    HybridShadowApp::Flush();
+
+    for (auto&& device : devices)
+    {
+        device->ResetAllocators(frameCount);
+        device->TerminatedQueuesWorker();
+        device.reset();
+    }
+
+    devices.clear();
+
+    logThreadIsAlive = false;
+}
+
 void HybridShadowApp::InitDevices()
 {
     devices.resize(GraphicAdapterCount);
@@ -56,7 +72,7 @@ void HybridShadowApp::InitDevices()
 
         typedRenderer.push_back(MemoryAllocator::CreateVector<custom_vector<std::shared_ptr<Renderer>>>());
 
-        for (int i = 0; i < (int)RenderMode::Count; ++i)
+        for (int i = 0; i < static_cast<int>(RenderMode::Count); ++i)
         {
             typedRenderer[typedRenderer.size() - 1].push_back(
                 MemoryAllocator::CreateVector<std::shared_ptr<Renderer>>());
@@ -529,7 +545,7 @@ void HybridShadowApp::DublicateResource()
         logQueue.Push(std::wstring(L"\nStart Dublicate Resource for " + devices[i]->GetName()));
         try
         {
-            auto queue = devices[i]->GetCommandQueue(GQueueType::Copy);
+            auto queue = devices[i]->GetCommandQueue(GQueueType::Compute);
             const auto cmdList = queue->GetCommandList();
 
 
@@ -581,13 +597,13 @@ std::shared_ptr<Renderer> HybridShadowApp::CreateRenderer(const UINT deviceIndex
 }
 
 void HybridShadowApp::AddMultiDeviceOpaqueRenderComponent(GameObject* object, const std::wstring& modelName,
-                                                       RenderMode psoType)
+                                                          RenderMode psoType)
 {
     for (int i = 0; i < GraphicAdapterCount; ++i)
     {
         auto renderer = CreateRenderer(i, models[i][modelName]);
         object->AddComponent(renderer);
-        typedRenderer[i][(int)RenderMode::OpaqueAlphaDrop].push_back(renderer);
+        typedRenderer[i][static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     }
 }
 
@@ -606,7 +622,7 @@ void HybridShadowApp::CreateGO()
                                                  assets[GraphicAdapterPrimary].GetTextureIndex(L"skyTex"));
 
         skySphere->AddComponent(renderer);
-        typedRenderer[GraphicAdapterPrimary][(int)RenderMode::SkyBox].push_back((renderer));
+        typedRenderer[GraphicAdapterPrimary][static_cast<int>(RenderMode::SkyBox)].push_back((renderer));
     }
     gameObjects.push_back(std::move(skySphere));
 
@@ -616,8 +632,8 @@ void HybridShadowApp::CreateGO()
                                                         models[GraphicAdapterPrimary][L"quad"]);
         renderer->SetModel(models[GraphicAdapterPrimary][L"quad"]);
         quadRitem->AddComponent(renderer);
-        typedRenderer[GraphicAdapterPrimary][(int)RenderMode::Debug].push_back(renderer);
-        typedRenderer[GraphicAdapterPrimary][(int)RenderMode::Quad].push_back(renderer);
+        typedRenderer[GraphicAdapterPrimary][static_cast<int>(RenderMode::Debug)].push_back(renderer);
+        typedRenderer[GraphicAdapterPrimary][static_cast<int>(RenderMode::Quad)].push_back(renderer);
     }
     gameObjects.push_back(std::move(quadRitem));
 
@@ -886,30 +902,37 @@ bool HybridShadowApp::Initialize()
     InitMainWindow();
 
     LoadStudyTexture();
+    Flush();
     LoadModels();
+    Flush();
     CreateMaterials();
+    Flush();
     DublicateResource();
+    Flush();
     MipMasGenerate();
-
+    Flush();
     InitRenderPaths();
+    Flush();
     InitSRVMemoryAndMaterials();
+    Flush();
     InitRootSignature();
+    Flush();
     InitPipeLineResource();
+    Flush();
     CreateGO();
+    Flush();
     SortGO();
+    Flush();
     InitFrameResource();
-
+    Flush();
     OnResize();
 
-    for (auto&& device : devices)
-    {
-        device->Flush();
-    }
+    Flush();
 
     MainWindow->SetWindowTitle(
         MainWindow->GetWindowName() + L" SSAA X" + std::to_wstring(multi) + L" Calculate Part Shadow Map:" +
         std::to_wstring(!UseOnlyPrime));
-    
+
 
     return true;
 }
@@ -1337,16 +1360,16 @@ void HybridShadowApp::PopulateForwardPathCommands(const std::shared_ptr<GCommand
 }
 
 void HybridShadowApp::PopulateDrawCommands(const GraphicsAdapter adapterIndex, const std::shared_ptr<GCommandList>& cmdList,
-                                        RenderMode type)
+                                           RenderMode type)
 {
-    for (auto&& renderer : typedRenderer[adapterIndex][(int)type])
+    for (auto&& renderer : typedRenderer[adapterIndex][static_cast<int>(type)])
     {
         renderer->Draw(cmdList);
     }
 }
 
 void HybridShadowApp::PopulateDrawQuadCommand(const std::shared_ptr<GCommandList>& cmdList,
-                                           GTexture& renderTarget, GDescriptor* rtvMemory, const UINT offsetRTV)
+                                              GTexture& renderTarget, GDescriptor* rtvMemory, const UINT offsetRTV)
 {
     cmdList->SetViewports(&fullViewport, 1);
     cmdList->SetScissorRects(&fullRect, 1);
@@ -1367,7 +1390,7 @@ void HybridShadowApp::PopulateDrawQuadCommand(const std::shared_ptr<GCommandList
 }
 
 void HybridShadowApp::PopulateCopyResource(const std::shared_ptr<GCommandList>& cmdList, const GResource& srcResource,
-                                        const GResource& dstResource)
+                                           const GResource& dstResource)
 {
     cmdList->CopyResource(dstResource, srcResource);
     cmdList->TransitionBarrier(dstResource,

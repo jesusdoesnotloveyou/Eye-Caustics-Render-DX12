@@ -243,7 +243,7 @@ namespace PEPEngine::Graphics
     }
 
 
-    void GDevice::ResetAllocators(uint64_t frameCount)
+    void GDevice::ResetAllocators(uint64_t frameCount) const
     {
         for (auto& allocator : graphicAllocators)
         {
@@ -258,7 +258,7 @@ namespace PEPEngine::Graphics
         }
     }
 
-    GDescriptor GDevice::AllocateDescriptors(const D3D12_DESCRIPTOR_HEAP_TYPE type, const uint32_t descriptorCount)
+    GDescriptor GDevice::AllocateDescriptors(const D3D12_DESCRIPTOR_HEAP_TYPE type, const uint32_t descriptorCount) const
     {
         return graphicAllocators[type]->Allocate(descriptorCount);
     }
@@ -274,7 +274,7 @@ namespace PEPEngine::Graphics
         return size;
     }
 
-    void GDevice::Flush()
+    void GDevice::Flush() const
     {
         for (auto&& queue : queues)
         {
@@ -284,7 +284,7 @@ namespace PEPEngine::Graphics
         ResetAllocators(0);
     }
 
-    void GDevice::TerminatedQueuesWorker()
+    void GDevice::TerminatedQueuesWorker() const
     {
         for (auto&& queue : queues)
         {

@@ -32,7 +32,7 @@ void ParticleEmitter::DescriptorInitialize()
         srvDesc.Texture2D.PlaneSlice = 0;
         srvDesc.Texture2D.MostDetailedMip = 0;
         srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-        srvDesc.Texture2D.MipLevels = desc.MipLevels;
+        srvDesc.Texture2D.MipLevels = 1;
 
         texture->CreateShaderResourceView(&srvDesc, &particlesRenderDescriptors, 2 + i);
     }
@@ -182,7 +182,7 @@ ParticleEmitter::ParticleEmitter(const std::shared_ptr<GDevice>& device, const D
     emitterData.InjectedGroupCount = CalculateGroupCount(emitterData.ParticleInjectCount);
 
     {
-        auto queue = device->GetCommandQueue(GQueueType::Copy);
+        auto queue = device->GetCommandQueue(GQueueType::Compute);
         auto cmdList = queue->GetCommandList();
         for (int i = 1; i <= 64; ++i)
         {
@@ -243,6 +243,7 @@ void ParticleEmitter::Draw(const std::shared_ptr<GCommandList>& cmdList)
     cmdList->TransitionBarrier(ParticlesAlive->GetD3D12Resource(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     cmdList->FlushResourceBarriers();
 
+    cmdList->SetPipelineState(*renderPSO.get());
     cmdList->SetDescriptorsHeap(&particlesRenderDescriptors);
 
     cmdList->SetRootConstantBufferView(ParticleRenderSlot::ObjectData, *objectPositionBuffer.get());
@@ -255,9 +256,7 @@ void ParticleEmitter::Draw(const std::shared_ptr<GCommandList>& cmdList)
     cmdList->SetRootDescriptorTable(ParticleRenderSlot::ParticlesAliveIndex, &particlesRenderDescriptors, 1);
 
     cmdList->SetRootDescriptorTable(ParticleRenderSlot::Atlas, &particlesRenderDescriptors, 2);
-
-
-    cmdList->SetPipelineState(*renderPSO.get());
+    
     cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
     cmdList->SetIBuffer();
     cmdList->SetVBuffer();
@@ -286,6 +285,8 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
 
     cmdList->SetDescriptorsHeap(&particlesComputeDescriptors);
 
+    cmdList->SetPipelineState(*injectedPSO.get());
+    
     cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
                                     ParticleComputeSlot::ParticlesPool - 1);
     cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
