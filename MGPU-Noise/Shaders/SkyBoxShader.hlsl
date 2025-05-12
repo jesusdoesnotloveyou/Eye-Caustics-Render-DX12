@@ -5,6 +5,7 @@ struct VertexOut
 {
 	float4 PosH : SV_POSITION;
 	float3 PosL : POSITION;
+	float2 UV : UV;
 };
 
 struct VertexIn
@@ -30,11 +31,11 @@ VertexOut SKYMAP_VS(VertexIn vin)
 
 	// Set z = w so that z/w = 1 (i.e., skydome always on far plane).
 	vout.PosH = mul(posW, worldBuffer.ViewProj).xyww;
-
+	vout.UV = vin.TexC;
 	return vout;
 }
 
 float4 SKYMAP_PS(VertexOut pin) : SV_Target
 {
-	return SkyMap.Sample(gsamLinearWrap, pin.PosL);
+	return ssaoMap.Sample(gsamLinearWrap, pin.UV);
 }

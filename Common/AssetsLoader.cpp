@@ -349,12 +349,12 @@ void AssetsLoader::AddTexture(const std::shared_ptr<GTexture>& texture)
     textures.push_back((texture));
 }
 
-std::vector<std::shared_ptr<Material>>& AssetsLoader::GetMaterials()
+const std::vector<std::shared_ptr<Material>>& AssetsLoader::GetMaterials()
 {
     return materials;
 }
 
-std::vector<std::shared_ptr<GTexture>>& AssetsLoader::GetTextures()
+const std::vector<std::shared_ptr<GTexture>>& AssetsLoader::GetTextures()
 {
     return textures;
 }

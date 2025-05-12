@@ -53,9 +53,9 @@ public:
 
     void AddTexture(const std::shared_ptr<GTexture>& texture);
 
-    std::vector<std::shared_ptr<Material>>& GetMaterials();
+    const std::vector<std::shared_ptr<Material>>& GetMaterials();
 
-    std::vector<std::shared_ptr<GTexture>>& GetTextures();
+    const std::vector<std::shared_ptr<GTexture>>& GetTextures();
 
     bool TryGetTexture(const std::wstring& name, std::shared_ptr<GTexture>*& OutTexture);
     std::shared_ptr<GTexture>& GetTexture(UINT index);
