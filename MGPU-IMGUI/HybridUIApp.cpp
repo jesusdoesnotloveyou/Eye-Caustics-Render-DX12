@@ -894,7 +894,6 @@ void HybridUIApp::CreateGO()
     rotater->GetTransform()->SetParent(platform->GetTransform().get());
     rotater->GetTransform()->SetPosition(Vector3::Forward * 325 + Vector3::Left * 625);
     rotater->GetTransform()->SetEulerRotate(Vector3(0, -90, 90));
-    rotater->AddComponent(std::make_shared<Rotater>(10));
 
     auto camera = std::make_unique<GameObject>("MainCamera");
     camera->GetTransform()->SetParent(rotater->GetTransform().get());
@@ -902,6 +901,12 @@ void HybridUIApp::CreateGO()
     camera->GetTransform()->SetPosition(Vector3(-1000, 190, -32));
     camera->AddComponent(std::make_shared<Camera>(AspectRatio()));
 
+#if defined(DEBUG) || defined(_DEBUG)
+    camera->AddComponent(std::make_shared<CameraController>());
+#else
+    rotater->AddComponent(std::make_shared<Rotater>(10));
+#endif
+    
     gameObjects.push_back(std::move(camera));
     gameObjects.push_back(std::move(rotater));
 
