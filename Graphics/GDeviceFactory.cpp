@@ -126,25 +126,17 @@ namespace PEPEngine::Graphics
         return dxgiFactory;
     }
 
-    std::shared_ptr<GDevice> GDeviceFactory::GetDevice(const GraphicsAdapter adapter)
+    std::shared_ptr<GDevice>& GDeviceFactory::GetHardwareDevice(const GraphicsAdapter adapter)
     {
         return hardwareDevices[adapter];
     }
 
 
-    std::vector<std::shared_ptr<GDevice>> GDeviceFactory::GetAllDevices(const bool useWrap)
+    std::vector<std::shared_ptr<GDevice>>& GDeviceFactory::GetAllDevices(const bool useWrap)
     {
-        std::vector<std::shared_ptr<GDevice>> devices;
-
-        devices.reserve(hardwareDevices.size());
-        for (auto&& device : hardwareDevices)
-        {
-            devices.push_back(device);
-        }
-
         if (!useWrap)
         {
-            return devices;
+            return hardwareDevices;
         }
 
         if (wrapDevice == nullptr)
@@ -159,8 +151,8 @@ namespace PEPEngine::Graphics
             }
         }
 
-        devices.push_back(wrapDevice);
-        return devices;
+        hardwareDevices.push_back(wrapDevice);
+        return hardwareDevices;
     }
 
     bool GDeviceFactory::IsTearingSupport()

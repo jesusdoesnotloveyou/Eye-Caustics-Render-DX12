@@ -37,11 +37,10 @@ void PEPEngine::Graphics::GRenderTexture::Resize(const UINT newHeight, const UIN
     CreateRTV();
 }
 
-void PEPEngine::Graphics::GRenderTexture::ChangeTexture(const ComPtr<ID3D12Resource>& texture)
+void PEPEngine::Graphics::GRenderTexture::ChangeTexture(const ComPtr<ID3D12Resource>& texture, std::shared_ptr<GDevice>& device)
 {
     if (renderTexture != nullptr && renderTexture->IsValid())
     {
-        auto device = renderTexture->GetDevice();
         renderTexture->Reset();
         renderTexture->SetD3D12Resource(device, texture);
     }
@@ -52,7 +51,7 @@ void PEPEngine::Graphics::GRenderTexture::ChangeTexture(const ComPtr<ID3D12Resou
             renderTexture = std::make_shared<GTexture>(L"RenderTarget");
         }
 
-        renderTexture->SetD3D12Resource(GDeviceFactory::GetDevice(), texture);
+        renderTexture->SetD3D12Resource(device, texture);
     }
 
     CreateRTV();

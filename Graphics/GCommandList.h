@@ -60,7 +60,7 @@ namespace PEPEngine::Graphics
 
     public:
         GCommandList(const std::shared_ptr<GCommandQueue>& queue, D3D12_COMMAND_LIST_TYPE type);
-        std::shared_ptr<GDevice> GetDevice() const;
+        std::shared_ptr<GDevice>& GetDevice() const;
 
         virtual ~GCommandList();
         void BeginQuery(UINT index) const;

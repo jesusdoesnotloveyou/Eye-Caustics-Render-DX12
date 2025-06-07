@@ -49,7 +49,7 @@ namespace PEPEngine::Graphics
         }
     }
 
-    static GRootSignature GetSignature()
+    static GRootSignature GetSignature(std::shared_ptr<GDevice>& device)
     {
         CD3DX12_DESCRIPTOR_RANGE srvCbvRanges[2];
         srvCbvRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -75,12 +75,12 @@ namespace PEPEngine::Graphics
         signature.AddDescriptorParameter(&srvCbvRanges[0], 1);
         signature.AddDescriptorParameter(&srvCbvRanges[1], 1);
         signature.AddStaticSampler(samplerDesc);
-        signature.Initialize(GDeviceFactory::GetDevice());
+        signature.Initialize(device);
 
         return GRootSignature(signature);
     }
 
-    static ComputePSO& GetPSO()
+    static ComputePSO& GetPSO(std::shared_ptr<GDevice>& device)
     {
         static auto shader = std::make_unique<GShader>(L"Shaders\\MipMapCS.hlsl", ComputeShader, nullptr,
                                                        "GenerateMipMaps",
@@ -88,10 +88,10 @@ namespace PEPEngine::Graphics
         shader->LoadAndCompile();
 
 
-        static auto RS = GetSignature();
+        static auto RS = GetSignature(device);
         static ComputePSO genMipMapPSO(RS);
         genMipMapPSO.SetShader(shader.get());
-        genMipMapPSO.Initialize(GDeviceFactory::GetDevice());
+        genMipMapPSO.Initialize(device);
 
         return genMipMapPSO;
     }
@@ -110,11 +110,12 @@ namespace PEPEngine::Graphics
             return;
         }
 
+        auto& device = cmdList->GetDevice();
 
-        auto mipMapsMemory = cmdList->GetDevice()->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        auto mipMapsMemory = device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
                                                                        2 * requiredHeapSize);
 
-        auto& PSO = GetPSO();
+        auto& PSO = GetPSO(device);
         cmdList->SetRootSignature(PSO.GetRootSignature());
         cmdList->SetPipelineState(PSO);
 

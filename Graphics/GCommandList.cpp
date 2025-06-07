@@ -24,7 +24,7 @@ namespace PEPEngine::Graphics
         TrackResource(res.GetD3D12Resource());
     }
 
-    std::shared_ptr<GDevice> GCommandList::GetDevice() const
+    std::shared_ptr<GDevice>& GCommandList::GetDevice() const
     {
         return queue->device;
     }

@@ -21,7 +21,7 @@ namespace PEPEngine::Graphics
 
         void Resize(UINT newHeight, UINT newWeight) const;
 
-        void ChangeTexture(const ComPtr<ID3D12Resource>& texture);
+        void ChangeTexture(const ComPtr<ID3D12Resource>& texture, std::shared_ptr<GDevice>& device);
 
         void ChangeTexture(const std::shared_ptr<GTexture>& texture);
 

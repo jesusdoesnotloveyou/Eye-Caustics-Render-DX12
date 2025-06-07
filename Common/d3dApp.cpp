@@ -161,7 +161,11 @@ namespace Common
 
     void D3DApp::Flush()
     {
-        GDeviceFactory::GetDevice()->Flush();
+        auto& devices = GDeviceFactory::GetAllDevices();
+        for (auto& device : devices)
+        {
+            device->Flush();
+        }
     }
 
     GameTimer* D3DApp::GetTimer()
@@ -423,7 +427,7 @@ namespace Common
 
     bool D3DApp::InitMainWindow()
     {
-        MainWindow = CreateRenderWindow(GDeviceFactory::GetDevice(), mainWindowCaption, 1920, 1080, false);
+        MainWindow = CreateRenderWindow(GDeviceFactory::GetHardwareDevice(), mainWindowCaption, 1920, 1080, false);
 
         return true;
     }
@@ -436,7 +440,7 @@ namespace Common
         msQualityLevels.SampleCount = 4;
         msQualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
         msQualityLevels.NumQualityLevels = 0;
-        ThrowIfFailed(GDeviceFactory::GetDevice()->GetDXDevice()->CheckFeatureSupport(
+        ThrowIfFailed(GDeviceFactory::GetHardwareDevice()->GetDXDevice()->CheckFeatureSupport(
             D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
             &msQualityLevels,
             sizeof(msQualityLevels)));
