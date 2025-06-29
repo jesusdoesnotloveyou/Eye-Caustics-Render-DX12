@@ -177,6 +177,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AssetsLoader.h" />
+    <ClInclude Include="BezierCurve.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="CloudGenerator.h" />
@@ -205,6 +206,7 @@
     <ClInclude Include="RenderModeFactory.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="SkyBox.h" />
+    <ClInclude Include="SplineController.h" />
     <ClInclude Include="SSAA.h" />
     <ClInclude Include="Ssao.h" />
     <ClInclude Include="Transform.h" />
@@ -212,6 +214,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssetsLoader.cpp" />
+    <ClCompile Include="BezierCurve.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="CloudGenerator.cpp" />
@@ -242,6 +245,7 @@
     <ClCompile Include="RenderModeFactory.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SkyBox.cpp" />
+    <ClCompile Include="SplineController.cpp" />
     <ClCompile Include="SSAA.cpp" />
     <ClCompile Include="Ssao.cpp" />
     <ClCompile Include="Transform.cpp" />
