@@ -118,10 +118,11 @@ void HybridSSAOApp::PopulateNormalMapCommands(const std::shared_ptr<GCommandList
         cmdList->SetViewports(&fullViewport, 1);
         cmdList->SetScissorRects(&fullRect, 1);
 
-        auto normalMap = ambientPrimePath->PrimeNormalMap();
-        auto normalDepthMap = ambientPrimePath->PrimeDepthMap();
-        auto normalMapRtv = ambientPrimePath->PrimeNormalMapRtv();
-        auto normalMapDsv = ambientPrimePath->PrimeNormalMapDSV();
+        auto& Resources = ambientPass->GetPrimeResources();
+        auto normalMap = Resources.GetNormalMap();
+        auto normalDepthMap = Resources.GetDepthMap();
+        auto normalMapRtv = Resources.GetNormalMapRTV();
+        auto normalMapDsv = Resources.GetDepthMapDSV();
 
         cmdList->TransitionBarrier(normalMap, D3D12_RESOURCE_STATE_RENDER_TARGET);
         cmdList->TransitionBarrier(normalDepthMap, D3D12_RESOURCE_STATE_DEPTH_WRITE);
@@ -144,24 +145,43 @@ void HybridSSAOApp::PopulateNormalMapCommands(const std::shared_ptr<GCommandList
         cmdList->TransitionBarrier(normalDepthMap, D3D12_RESOURCE_STATE_COMMON);
         cmdList->FlushResourceBarriers();
     }
-    if (IsUsingSharedSSAO)
-    {
-        
-    }
 }
 
 void HybridSSAOApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandList>& cmdList) const
 {
-    //Draw Ambient
+    if (IsUsingSharedSSAO)
     {
-        cmdList->SetDescriptorsHeap(&srvTexturesMemory);
-        //cmdList->SetRootSignature(*primeDeviceSignature.get());
-        cmdList->SetRootShaderResourceView(StandardShaderSlot::MaterialData,
-                                           *currentFrameResource->MaterialBuffer);
-        cmdList->SetRootDescriptorTable(StandardShaderSlot::TexturesMap, &srvTexturesMemory);
+        auto primeCopyQueue = primeDevice->GetCommandQueue(GQueueType::Copy);
+        auto secondQueue = secondDevice->GetCommandQueue();
+        if (currentFrameResource->SecondRenderFenceValue == 0 || secondQueue->IsFinish(currentFrameResource->SecondRenderFenceValue))
+        {
+            const auto& Resources = ambientPass->GetSecondResource();
+            const auto& CrossResource = ambientPass->GetCrossResources();
+            const auto secondCmdList = secondQueue->GetCommandList();
+            secondCmdList->CopyResource(Resources.GetNormalMap(), CrossResource.GetNormalMap().GetSharedResource());
+            secondCmdList->CopyResource(Resources.GetDepthMap(), CrossResource.GetDepthMap().GetSharedResource());
 
-        cmdList->SetRootSignature(*primeDeviceSignature.get());
-        ambientPrimePath->ComputeSsao(cmdList, currentFrameResource->SsaoConstantUploadBuffer, 3);
+            ambientPass->ComputeSsao(cmdList, currentFrameResource->SecondSsaoConstantUploadBuffer, Resources, 3);
+
+            secondCmdList->CopyResource(CrossResource.GetAmbientMap().GetSharedResource(), Resources.GetAmbientMap());
+
+            currentFrameResource->SecondRenderFenceValue = secondQueue->ExecuteCommandList(secondCmdList);
+        }
+
+        if (currentFrameResource->PrimeCopyFenceValue == 0 || primeCopyQueue->IsFinish(currentFrameResource->PrimeCopyFenceValue))
+        {
+            const auto& Resources = ambientPass->GetPrimeResources();
+            const auto& CrossResource = ambientPass->GetCrossResources();
+            auto primeCopyCmdList = primeCopyQueue->GetCommandList();
+
+            primeCopyCmdList->CopyResource(Resources.GetAmbientMap(), CrossResource.GetAmbientMap().GetSharedResource());
+
+            currentFrameResource->PrimeCopyFenceValue = primeCopyQueue->ExecuteCommandList(primeCopyCmdList);
+        }
+    }
+    else
+    {
+        ambientPass->ComputeSsao(cmdList, currentFrameResource->PrimeSsaoConstantUploadBuffer, ambientPass->GetPrimeResources(), 3);
     }
 }
 
@@ -193,7 +213,7 @@ void HybridSSAOApp::PopulateForwardPathCommands(const std::shared_ptr<GCommandLi
                                       *currentFrameResource->PrimePassConstantUploadBuffer);
 
         cmdList->SetRootDescriptorTable(StandardShaderSlot::ShadowMap, shadowPath->GetSrv());
-        cmdList->SetRootDescriptorTable(StandardShaderSlot::AmbientMap, ambientPrimePath->PrimeAmbientMapSrv(), 0);
+        cmdList->SetRootDescriptorTable(StandardShaderSlot::AmbientMap, ambientPass->GetPrimeResources().GetAmbientMapSRV(), 0);
 
 
         cmdList->SetPipelineState(*defaultPrimePipelineResources.GetPSO(RenderMode::SkyBox));
@@ -217,7 +237,7 @@ void HybridSSAOApp::PopulateForwardPathCommands(const std::shared_ptr<GCommandLi
 }
 
 void HybridSSAOApp::PopulateDrawCommands(const std::shared_ptr<GCommandList>& cmdList,
-                                       RenderMode type) const
+                                         RenderMode type) const
 {
     for (auto&& renderer : typedRenderer[static_cast<int>(type)])
     {
@@ -226,7 +246,7 @@ void HybridSSAOApp::PopulateDrawCommands(const std::shared_ptr<GCommandList>& cm
 }
 
 void HybridSSAOApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>& cmdList, const GTexture& renderTarget,
-                                           const GDescriptor* rtvMemory, const UINT offsetRTV) const
+                                             const GDescriptor* rtvMemory, const UINT offsetRTV) const
 {
     cmdList->SetViewports(&fullViewport, 1);
     cmdList->SetScissorRects(&fullRect, 1);
@@ -239,8 +259,8 @@ void HybridSSAOApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>
 }
 
 void HybridSSAOApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
-                                              const GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
-                                              const GraphicPSO& pso) const
+                                                const GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
+                                                const GraphicPSO& pso) const
 {
     cmdList->SetRootDescriptorTable(StandardShaderSlot::AmbientMap, renderTextureSRVMemory, renderTextureMemoryOffset);
 
@@ -255,13 +275,14 @@ void HybridSSAOApp::PopulateDebugCommands(const std::shared_ptr<GCommandList>& c
     case 1:
         {
             PopulateDrawFullQuadTexture(cmdList, shadowPath->GetSrv(),
-                                0, *defaultPrimePipelineResources.GetPSO(RenderMode::Quad));
+                                        0, *defaultPrimePipelineResources.GetPSO(RenderMode::Quad));
             break;
         }
     case 2:
         {
-            PopulateDrawFullQuadTexture(cmdList, ambientPrimePath->PrimeAmbientMapSrv(),
-                                0, *defaultPrimePipelineResources.GetPSO(RenderMode::Quad));
+            auto& Resources = ambientPass->GetPrimeResources();
+            PopulateDrawFullQuadTexture(cmdList, Resources.GetAmbientMapSRV(),
+                                        0, *defaultPrimePipelineResources.GetPSO(RenderMode::Quad));
             break;
         }
     }
@@ -277,18 +298,8 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
     auto primeCmdList = primeRenderQueue->GetCommandList();
     primeCmdList->EndQuery(timestampHeapIndex);
     PopulateNormalMapCommands(primeCmdList);
-
-    // if (sharedMode)
-    // PopulateDepthToSharedMemory()
-
-    // else
     PopulateAmbientMapCommands(primeCmdList);
-    
     PopulateShadowMapCommands(primeCmdList);
-
-    // if (sharedMode)
-    // PopulateAmbientToPrimeMemory()
-    
     PopulateForwardPathCommands(primeCmdList);
     PopulateInitRenderTarget(primeCmdList, MainWindow->GetCurrentBackBuffer(),
                              &currentFrameResource->BackBufferRTVMemory, 0);
@@ -296,7 +307,7 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
                                 0, *defaultPrimePipelineResources.GetPSO(RenderMode::Quad));
 
     PopulateDebugCommands(primeCmdList);
-   
+
     UIPath->Render(primeCmdList);
 
     primeCmdList->TransitionBarrier(MainWindow->GetCurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
@@ -304,68 +315,8 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
     primeCmdList->EndQuery(timestampHeapIndex + 1);
     primeCmdList->ResolveQuery(timestampHeapIndex, 2, timestampHeapIndex * sizeof(UINT64));
     currentFrameResource->PrimeRenderFenceValue = primeRenderQueue->ExecuteCommandList(primeCmdList);
-    
+
     currentFrameResourceIndex = MainWindow->Present();
-}
-
-void HybridSSAOApp::NewDraw(const GameTimer& gt)
-{
-    if (isResizing) return;
-
-    const UINT timestampHeapIndex = 2 * currentFrameResourceIndex;
-
-    if (IsUsingSharedSSAO) // change to IsUsingSharedSSAO
-    {
-        // cache commandQueue of secondaryGPU
-        auto secondRenderQueue = secondDevice->GetCommandQueue();
-        
-        if (currentFrameResource->SecondRenderFenceValue == 0 || secondRenderQueue->IsFinish(
-            currentFrameResource->SecondRenderFenceValue))
-        {
-            // cache commandList of secondaryGPU
-            auto cmdList = secondRenderQueue->GetCommandList();
-
-            // configure cmdList
-            cmdList->EndQuery(timestampHeapIndex);
-            cmdList->SetViewports(&fullViewport, 1);
-            cmdList->SetScissorRects(&fullRect, 1);
-            
-            // it's secondDeviceUITexture
-            // need to change them to secondDeviceSSAOTexture or something
-            cmdList->TransitionBarrier(secondDeviceUITexture, D3D12_RESOURCE_STATE_RENDER_TARGET);
-            cmdList->FlushResourceBarriers();
-            cmdList->ClearRenderTarget(&secondDeviceUIBackBufferRTV, 0, Colors::Black);
-
-            cmdList->SetRenderTargets(1, &secondDeviceUIBackBufferRTV, 0);
-
-
-            // copy depth from shared to secondary
-            
-            // actual render method,
-            // ambientSecondaryPath->ComputeSsao(cmdList); // lack of args, possibly change to another method?
-
-            // copy the result from secondaryGPU to the shared
-            cmdList->CopyResource(crossAdapterUITexture->GetSharedResource(), secondDeviceUITexture);
-
-            cmdList->EndQuery(timestampHeapIndex + 1);
-            cmdList->ResolveQuery(timestampHeapIndex, 2, timestampHeapIndex * sizeof(UINT64));
-
-            currentFrameResource->SecondRenderFenceValue = secondRenderQueue->ExecuteCommandList(cmdList);
-        }
-
-        auto copyPrimeQueue = primeDevice->GetCommandQueue(GQueueType::Copy);
-
-        if (currentFrameResource->PrimeCopyFenceValue == 0 || copyPrimeQueue->IsFinish(
-            currentFrameResource->PrimeCopyFenceValue))
-        {
-            auto cmdList = copyPrimeQueue->GetCommandList();
-
-            // copy the result from shared to the primeGPU
-            cmdList->CopyResource(primeDeviceUITexture, crossAdapterUITexture->GetPrimeResource());
-
-            currentFrameResource->PrimeCopyFenceValue = copyPrimeQueue->ExecuteCommandList(cmdList);
-        }
-    }
 }
 
 bool HybridSSAOApp::Initialize()
@@ -457,7 +408,9 @@ void HybridSSAOApp::InitRootSignature()
     rootSignature->Initialize(primeDevice);
 
     primeDeviceSignature = rootSignature;
-
+    secondDeviceSignature = std::make_shared<GRootSignature>();
+    secondDeviceSignature->SetDesc(rootSignature->GetRootSignatureDesc());
+    secondDeviceSignature->Initialize(secondDevice);
 
     logQueue.Push(std::wstring(L"\nInit RootSignature for " + primeDevice->GetName()));
 
@@ -549,10 +502,6 @@ void HybridSSAOApp::InitPipeLineResource()
                                                  BackBufferFormat, DXGI_FORMAT_D32_FLOAT, ssaoPrimeRootSignature,
                                                  NormalMapFormat, AmbientMapFormat);
 
-    ambientPrimePath->SetPipelineData(*defaultPrimePipelineResources.GetPSO(RenderMode::Ssao),
-                                      *defaultPrimePipelineResources.GetPSO(RenderMode::SsaoBlur));
-
-
     logQueue.Push(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
 
     const auto primeDeviceShadowMapPso = defaultPrimePipelineResources.GetPSO(RenderMode::ShadowMapOpaque);
@@ -592,7 +541,6 @@ void HybridSSAOApp::InitSRVMemoryAndMaterials()
     }
 
     logQueue.Push(std::wstring(L"\nInit Views for " + primeDevice->GetName()));
-    ambientPrimePath->BuildDescriptors();
 
     primeUIBackBufferSRV = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -604,14 +552,18 @@ void HybridSSAOApp::InitRenderPaths()
     auto commandQueue = primeDevice->GetCommandQueue(GQueueType::Graphics);
     auto cmdList = commandQueue->GetCommandList();
 
-    ambientPrimePath = std::make_shared<SharedSSAO>();
+    ambientPass = std::make_shared<SharedSSAO>();
 
-    ambientPrimePath->Initialize(
+    const D3D12_INPUT_LAYOUT_DESC layoutDesc = {defaultInputLayout.data(), defaultInputLayout.size()};
+
+
+    ambientPass->Initialize(
         primeDevice,
         secondDevice,
-        MainWindow->GetClientWidth(),
-        MainWindow->GetClientHeight());
-    
+        layoutDesc,
+        MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
+    ambientPass->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
+
     antiAliasingPrimePath = (std::make_shared<SSAA>(primeDevice, 2, MainWindow->GetClientWidth(),
                                                     MainWindow->GetClientHeight(), DXGI_FORMAT_D32_FLOAT));
     antiAliasingPrimePath->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
@@ -934,7 +886,7 @@ void HybridSSAOApp::CreateGO()
     rotater->GetTransform()->SetParent(platform->GetTransform().get());
     rotater->GetTransform()->SetPosition(Vector3::Forward * 325 + Vector3::Left * 625);
     rotater->GetTransform()->SetEulerRotate(Vector3(0, -90, 90));
-    
+
     auto camera = std::make_unique<GameObject>("MainCamera");
     camera->GetTransform()->SetParent(rotater->GetTransform().get());
     camera->GetTransform()->SetEulerRotate(Vector3(-30, 270, 0));
@@ -946,7 +898,7 @@ void HybridSSAOApp::CreateGO()
 #else
     rotater->AddComponent(std::make_shared<Rotater>(10));
 #endif
-    
+
     gameObjects.push_back(std::move(camera));
     gameObjects.push_back(std::move(rotater));
 
@@ -1238,7 +1190,7 @@ void HybridSSAOApp::UpdateShadowPassCB(const GameTimer& gt)
     auto invView = view.Invert();
     auto invProj = proj.Invert();
     auto invViewProj = viewProj.Invert();
-    
+
     shadowPassCB.View = view.Transpose();
     shadowPassCB.InvView = invView.Transpose();
     shadowPassCB.Proj = proj.Transpose();
@@ -1338,15 +1290,15 @@ void HybridSSAOApp::UpdateSsaoCB(const GameTimer& gt) const
 
     //for (int i = 0; i < GraphicAdapterCount; ++i)
     {
-        ambientPrimePath->GetOffsetVectors(ssaoCB.OffsetVectors);
+        ambientPass->GetPrimeResources().GetOffsetVectors(ssaoCB.OffsetVectors);
 
-        auto blurWeights = ambientPrimePath->CalcGaussWeights(2.5f);
+        auto blurWeights = ambientPass->CalcGaussWeights(2.5f);
         ssaoCB.BlurWeights[0] = Vector4(&blurWeights[0]);
         ssaoCB.BlurWeights[1] = Vector4(&blurWeights[4]);
         ssaoCB.BlurWeights[2] = Vector4(&blurWeights[8]);
 
-        ssaoCB.InvRenderTargetSize = Vector2(1.0f / ambientPrimePath->SsaoMapWidth(),
-                                             1.0f / ambientPrimePath->SsaoMapHeight());
+        ssaoCB.InvRenderTargetSize = Vector2(1.0f / ambientPass->SsaoMapWidth(),
+                                             1.0f / ambientPass->SsaoMapHeight());
 
         // Coordinates given in view space.
         ssaoCB.OcclusionRadius = 0.5f;
@@ -1354,8 +1306,8 @@ void HybridSSAOApp::UpdateSsaoCB(const GameTimer& gt) const
         ssaoCB.OcclusionFadeEnd = 1.0f;
         ssaoCB.SurfaceEpsilon = 0.05f;
 
-        auto currSsaoCB = currentFrameResource->SsaoConstantUploadBuffer;
-        currSsaoCB->CopyData(0, ssaoCB);
+        currentFrameResource->PrimeSsaoConstantUploadBuffer->CopyData(0, ssaoCB);
+        currentFrameResource->SecondSsaoConstantUploadBuffer->CopyData(0, ssaoCB);
     }
 }
 
@@ -1411,10 +1363,9 @@ void HybridSSAOApp::OnResize()
         camera->SetAspectRatio(AspectRatio());
     }
 
-    if (ambientPrimePath != nullptr)
+    if (ambientPass != nullptr)
     {
-        ambientPrimePath->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
-        ambientPrimePath->RebuildDescriptors();
+        ambientPass->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
     }
 
     if (antiAliasingPrimePath != nullptr)

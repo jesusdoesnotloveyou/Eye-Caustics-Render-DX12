@@ -4,7 +4,10 @@
 #include "GCrossAdapterResource.h"
 #include "GraphicPSO.h"
 #include "GDescriptor.h"
+#include "GRenderTarger.h"
 #include "GTexture.h"
+#include "MathHelper.h"
+#include "RenderModeFactory.h"
 #include "ShaderBuffersData.h"
 
 using namespace DirectX::SimpleMath;
@@ -14,7 +17,96 @@ using namespace Graphics;
 using namespace Allocator;
 using namespace Utils;
 
-class SharedSSAO
+class SSAOCrossResources;
+class SharedSSAO;
+
+static constexpr int MaxBlurRadius = 5;
+
+class SSAOResources final
+{
+    static constexpr DXGI_FORMAT AmbientMapFormat = DXGI_FORMAT_R16_UNORM;
+    static constexpr DXGI_FORMAT NormalMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    static constexpr DXGI_FORMAT DepthMapFormat = DXGI_FORMAT_R32_TYPELESS;
+
+    std::shared_ptr<GDevice> device;
+    std::shared_ptr<GRootSignature> ssaoRootSignature;
+
+    std::shared_ptr<GraphicPSO> ssaoPSO;
+    std::shared_ptr<GraphicPSO> blurPSO;
+    GTexture randomVectorMap;
+    GDescriptor randomVectorMapSRV;
+
+    GTexture normalMap;
+    GDescriptor normalMapSRV;
+    GDescriptor normalMapRTV;
+
+    GTexture ambientMap0;
+    GTexture ambientMap1;
+    GDescriptor ambientMapSRV;
+    GDescriptor ambientMapRTV;
+
+    GTexture depthMap;
+    GDescriptor depthMapSRV;
+    GDescriptor depthMapDSV;
+
+    Vector4 offsetsVectors[14];
+
+public:
+    const GTexture& GetRandomVectorMap() const { return randomVectorMap; }
+    const GTexture& GetNormalMap() const { return normalMap; }
+    const GTexture& GetAmbientMap() const { return ambientMap0; }
+    const GTexture& GetBluredAmbientMap() const { return ambientMap1; }
+    const GTexture& GetDepthMap() const { return depthMap; }
+
+    const GDescriptor* GetNormalMapSRV() const { return &normalMapSRV; }
+    const GDescriptor* GetNormalMapRTV() const { return &normalMapRTV; }
+    const GDescriptor* GetAmbientMapSRV() const { return &ambientMapSRV; }
+    const GDescriptor* GetAmbientMapRTV() const { return &ambientMapRTV; }
+    const GDescriptor* GetDepthMapSRV() const { return &depthMapSRV; }
+    const GDescriptor* GetDepthMapDSV() const { return &depthMapDSV; }
+    const GDescriptor* GetRandomVectorSRV() const { return &randomVectorMapSRV; }
+
+    const GRootSignature& GetRootSignature() const  { return *ssaoRootSignature;}
+    const GraphicPSO& GetSSAOPSO() const { return *ssaoPSO;}
+    const GraphicPSO& GetBlurPSO() const { return *blurPSO;}
+    
+    void Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout);
+
+    void OnResize(uint32_t width, uint32_t height);
+
+    void GetOffsetVectors(Vector4 offsets[14]) const
+    {
+        std::copy(&offsetsVectors[0], &offsetsVectors[14], &offsets[0]);
+    }
+
+private:
+    void RebuildDescriptors() const;
+
+    void BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout);
+
+    void BuildOffsetVectors();
+
+    void BuildRandomTexture();
+};
+
+class SSAOCrossResources final
+{
+    std::shared_ptr<GCrossAdapterResource> sharedNormalMap;
+    std::shared_ptr<GCrossAdapterResource> sharedDepthMap;
+    std::shared_ptr<GCrossAdapterResource> sharedAmbientMap;
+
+public:
+    void Initialize(const SSAOResources& Resources, const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice);
+
+    void OnResize(uint32_t width, uint32_t height) const;
+
+    const GCrossAdapterResource& GetNormalMap() const { return *sharedNormalMap; }
+    const GCrossAdapterResource& GetDepthMap() const { return *sharedDepthMap; }
+    const GCrossAdapterResource& GetAmbientMap() const { return *sharedAmbientMap; }
+};
+
+
+class SharedSSAO final
 {
 public:
     SharedSSAO();
@@ -22,116 +114,37 @@ public:
     SharedSSAO& operator=(const SharedSSAO& rhs) = delete;
     ~SharedSSAO();
 
-    static constexpr DXGI_FORMAT AmbientMapFormat = DXGI_FORMAT_R16_UNORM;
-    static constexpr DXGI_FORMAT NormalMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-    static constexpr int MaxBlurRadius = 5;
-
     UINT SsaoMapWidth() const;
     UINT SsaoMapHeight() const;
 
     void GetOffsetVectors(Vector4 offsets[]);
-    std::vector<float> CalcGaussWeights(float sigma);
+    static std::vector<float> CalcGaussWeights(float sigma);
 
-
-    // Getters
-    GTexture& PrimeNormalMap();
-    GTexture& PrimeAmbientMap();
-    GTexture& PrimeDepthMap();
-
-    GDescriptor* PrimeNormalMapDSV();
-    GDescriptor* PrimeNormalMapRtv();
-    GDescriptor* PrimeNormalMapSrv();
-    GDescriptor* PrimeAmbientMapSrv();
-
-    void Initialize(const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice,
-        const UINT width, const UINT height);
+    const SSAOResources& GetPrimeResources() { return primeResources; }
+    const SSAOResources& GetSecondResource() { return secondResources; }
+    const SSAOCrossResources& GetCrossResources() { return crossResources; }
     
-    void BuildDescriptors();
-
-    void RebuildDescriptors() const;
-
-    void SetPipelineData(GraphicPSO& ssaoPso, GraphicPSO& ssaoBlurPso);
+    void Initialize(const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice,
+                    const D3D12_INPUT_LAYOUT_DESC& layout, UINT width, UINT height);
 
     void OnResize(UINT newWidth, UINT newHeight);
 
-    
 
     void ComputeSsao(
         const std::shared_ptr<GCommandList>& cmdList,
         const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame,
-        int blurCount);
-    void ClearAmbientMap(const std::shared_ptr<GCommandList>& cmdList) const;
+        const SSAOResources& Resources, int blurCount);
+    static void ClearAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources);
+    static void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources, const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame, int blurCount);
+    static void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources, bool horzBlur);
 
 private:
-    std::shared_ptr<GRootSignature> ssaoPrimeRootSignature;
-    std::shared_ptr<GRootSignature> ssaoSecondRootSignature;
+    SSAOResources primeResources;
+    SSAOResources secondResources;
+    SSAOCrossResources crossResources;
 
-    void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList,
-                        const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame, int blurCount);
-    void BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, bool horzBlur) const;
-    GTexture CreateNormalMap(const std::shared_ptr<GDevice>& device) const;
-    GTexture CreateAmbientMap(const std::shared_ptr<GDevice>& device) const;
-    GTexture CreateDepthMap(const std::shared_ptr<GDevice>& device) const;
-
-    void BuildResources(const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice);
-    void BuildRandomVectorTexture(const GTexture& texture, const std::shared_ptr<GCommandList>& cmdList);
-
-    void BuildOffsetVectors();
-
-    std::shared_ptr<GDevice> primeDevice;
-    std::shared_ptr<GDevice> secondDevice;
-
-    
-    GraphicPSO mSsaoPso;
-    GraphicPSO mBlurPso;
-
-    
-    /* Primary GPU resources */
-    GTexture primeRandomVectorMap;
-    GDescriptor primeRandomVectorSrvMemory;
-    
-    GTexture primeNormalMap;
-    GDescriptor primeNormalMapSrvMemory;
-    GDescriptor primeNormalMapRtvMemory;
-    
-    GTexture primeAmbientMap0;
-    GTexture primeAmbientMap1;
-    GDescriptor primeAmbientMapSrvMemory;
-    GDescriptor primeAmbientMapRtvMemory;
-    
-    GTexture primeDepthMap;
-    GDescriptor primeDepthMapSrvMemory;
-    GDescriptor primeDepthMapDsvMemory;
-
-    /* Secondary GPU resources */
-    GTexture secondRandomVectorMap;
-    GDescriptor secondRandomVectorSrvMemory;
-    
-    GTexture secondNormalMap;
-    GDescriptor secondNormalMapSrvMemory;
-    
-    GTexture secondAmbientMap0;
-    GTexture secondAmbientMap1;
-    GDescriptor secondAmbientMapSrvMemory;
-    GDescriptor secondAmbientMapRtvMemory;
-    
-    GTexture secondDepthMap;
-    GDescriptor secondDepthMapSrvMemory;
-
-    /* Shared GPU resources*/
-    std::shared_ptr<GCrossAdapterResource> sharedNormalMap;
-    std::shared_ptr<GCrossAdapterResource> sharedDepthMap;
-    std::shared_ptr<GCrossAdapterResource> sharedAmbientMap;
-
-    
-    void PrimeDrawCopyNormalDepth(const std::shared_ptr<GDevice>& secondDevice);
-    GTexture SharedSSAO::CreateSharedDepthMap(const std::shared_ptr<GDevice>& secondDevice);
-    
-    UINT mRenderTargetWidth;
-    UINT mRenderTargetHeight;
-
-    Vector4 mOffsets[14];
+    UINT RenderTargetWidth;
+    UINT RenderTargetHeight;
 
     D3D12_VIEWPORT mViewport;
     D3D12_RECT mScissorRect;

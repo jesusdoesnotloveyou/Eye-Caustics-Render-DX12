@@ -6,9 +6,12 @@ FrameResource::FrameResource(std::shared_ptr<GDevice> primeDevices, std::shared_
     PrimePassConstantUploadBuffer = (std::make_shared<ConstantUploadBuffer<PassConstants>>(
         primeDevices, passCount, primeDevices->GetName() + L"Prime Path Data Buffer"));
 
-    SsaoConstantUploadBuffer = (std::make_shared<ConstantUploadBuffer<SsaoConstants>>(
+    PrimeSsaoConstantUploadBuffer = (std::make_shared<ConstantUploadBuffer<SsaoConstants>>(
         primeDevices, 1, primeDevices->GetName() + L" SSAO Path Data Buffer"));
 
+    SecondSsaoConstantUploadBuffer = (std::make_shared<ConstantUploadBuffer<SsaoConstants>>(
+        secondDevice, 1, secondDevice->GetName() + L" SSAO Path Data Buffer"));
+    
     MaterialBuffer = std::make_shared<StructuredUploadBuffer<MaterialConstants>>(
         primeDevices, materialCount, primeDevices->GetName() + L" Material Data Buffer ");
 

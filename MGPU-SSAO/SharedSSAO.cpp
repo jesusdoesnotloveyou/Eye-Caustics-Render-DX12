@@ -14,570 +14,18 @@
 
 using namespace Microsoft::WRL;
 
-SharedSSAO::SharedSSAO() {}
-
-SharedSSAO::~SharedSSAO() = default;
-
-GDescriptor* SharedSSAO::PrimeNormalMapRtv()
+void SSAOResources::Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout)
 {
-    return &primeNormalMapRtvMemory;
-}
-
-GDescriptor* SharedSSAO::PrimeNormalMapSrv()
-{
-    return &primeNormalMapSrvMemory;
-}
-
-GDescriptor* SharedSSAO::PrimeAmbientMapSrv()
-{
-    return &primeAmbientMapSrvMemory;
-}
-
-UINT SharedSSAO::SsaoMapWidth() const
-{
-    return mRenderTargetWidth / 2;
-}
-
-UINT SharedSSAO::SsaoMapHeight() const
-{
-    return mRenderTargetHeight / 2;
-}
-
-void SharedSSAO::GetOffsetVectors(Vector4 offsets[14])
-{
-    std::copy(&mOffsets[0], &mOffsets[14], &offsets[0]);
-}
-
-std::vector<float> SharedSSAO::CalcGaussWeights(const float sigma)
-{
-    float twoSigma2 = 2.0f * sigma * sigma;
-
-    // Estimate the blur radius based on sigma since sigma controls the "width" of the bell curve.
-    // For example, for sigma = 3, the width of the bell curve is 
-    int blurRadius = static_cast<int>(ceil(2.0f * sigma));
-
-    assert(blurRadius <= MaxBlurRadius);
-
-    std::vector<float> weights;
-    weights.resize(2 * blurRadius + 1);
-
-    float weightSum = 0.0f;
-
-    for (int i = -blurRadius; i <= blurRadius; ++i)
-    {
-        float x = static_cast<float>(i);
-
-        weights[i + blurRadius] = expf(-x * x / twoSigma2);
-
-        weightSum += weights[i + blurRadius];
-    }
-
-    // Divide by the sum so all the weights add up to 1.0.
-    for (int i = 0; i < weights.size(); ++i)
-    {
-        weights[i] /= weightSum;
-    }
-
-    return weights;
-}
-
-GTexture& SharedSSAO::PrimeNormalMap()
-{
-    return primeNormalMap;
-}
-
-GTexture& SharedSSAO::PrimeDepthMap()
-{
-    return primeDepthMap;
-}
-
-GDescriptor* SharedSSAO::PrimeNormalMapDSV()
-{
-    return &primeDepthMapDsvMemory;
-}
-
-GTexture& SharedSSAO::PrimeAmbientMap()
-{
-    return primeAmbientMap0;
-}
-
-
-void SharedSSAO::BuildDescriptors()
-{
-    RebuildDescriptors();
-}
-
-void SharedSSAO::RebuildDescriptors() const
-{
-    // Prime GPU
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
-    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    dsvDesc.Texture2D.MipSlice = 0;
-    primeDepthMap.CreateDepthStencilView(&dsvDesc, &primeDepthMapDsvMemory);
-    
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Format = NormalMapFormat;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    srvDesc.Texture2D.MipLevels = 1;
-    primeNormalMap.CreateShaderResourceView(&srvDesc, &primeNormalMapSrvMemory);
-
-    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    primeDepthMap.CreateShaderResourceView(&srvDesc, &primeDepthMapSrvMemory);
-
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    primeRandomVectorMap.CreateShaderResourceView(&srvDesc, &primeRandomVectorSrvMemory);
-
-    srvDesc.Format = AmbientMapFormat;
-    primeAmbientMap0.CreateShaderResourceView(&srvDesc, &primeAmbientMapSrvMemory);
-    primeAmbientMap1.CreateShaderResourceView(&srvDesc, &primeAmbientMapSrvMemory, 1);
-
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    rtvDesc.Format = NormalMapFormat;
-    rtvDesc.Texture2D.MipSlice = 0;
-    rtvDesc.Texture2D.PlaneSlice = 0;
-    primeNormalMap.CreateRenderTargetView(&rtvDesc, &primeNormalMapRtvMemory);
-
-    rtvDesc.Format = AmbientMapFormat;
-    primeAmbientMap0.CreateRenderTargetView(&rtvDesc, &primeAmbientMapRtvMemory);
-    primeAmbientMap1.CreateRenderTargetView(&rtvDesc, &primeAmbientMapRtvMemory, 1);
-
-    // Secondary GPU    
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Format = NormalMapFormat;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    srvDesc.Texture2D.MipLevels = 1;
-    secondNormalMap.CreateShaderResourceView(&srvDesc, &secondNormalMapSrvMemory);
-
-    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    secondDepthMap.CreateShaderResourceView(&srvDesc, &secondDepthMapSrvMemory);
-
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    secondRandomVectorMap.CreateShaderResourceView(&srvDesc, &secondRandomVectorSrvMemory);
-
-    srvDesc.Format = AmbientMapFormat;
-    secondAmbientMap0.CreateShaderResourceView(&srvDesc, &secondAmbientMapSrvMemory);
-    secondAmbientMap1.CreateShaderResourceView(&srvDesc, &secondAmbientMapSrvMemory, 1);
-
-    rtvDesc.Format = AmbientMapFormat;
-    secondAmbientMap0.CreateRenderTargetView(&rtvDesc, &secondAmbientMapRtvMemory);
-    secondAmbientMap1.CreateRenderTargetView(&rtvDesc, &secondAmbientMapRtvMemory, 1);
-}
-
-void SharedSSAO::SetPipelineData(GraphicPSO& ssaoPso, GraphicPSO& ssaoBlurPso)
-{
-    mSsaoPso = ssaoPso;
-    mBlurPso = ssaoBlurPso;
-}
-
-void SharedSSAO::OnResize(const UINT newWidth, const UINT newHeight)
-{
-    if (mRenderTargetWidth != newWidth || mRenderTargetHeight != newHeight)
-    {
-        mRenderTargetWidth = newWidth;
-        mRenderTargetHeight = newHeight;
-
-        mViewport.TopLeftX = 0.0f;
-        mViewport.TopLeftY = 0.0f;
-        mViewport.Width = mRenderTargetWidth;
-        mViewport.Height = mRenderTargetHeight;
-        mViewport.MinDepth = 0.0f;
-        mViewport.MaxDepth = 1.0f;
-
-        mScissorRect = {0, 0, static_cast<int>(mRenderTargetWidth), static_cast<int>(mRenderTargetHeight)};
-
-        BuildResources(primeDevice, secondDevice);
-    }
-}
-
-void SharedSSAO::ComputeSsao(
-    const std::shared_ptr<GCommandList>& cmdList,
-    const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame,
-    const int blurCount)
-{
-    cmdList->SetViewports(&mViewport, 1);
-    cmdList->SetScissorRects(&mScissorRect, 1);
-
-    cmdList->TransitionBarrier(primeAmbientMap0, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    cmdList->FlushResourceBarriers();
-
-
-    float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    cmdList->ClearRenderTarget(&primeAmbientMapRtvMemory, 0, clearValue);
-
-    cmdList->SetRenderTargets(1, &primeAmbientMapRtvMemory, 0);
-
-    cmdList->SetPipelineState(mSsaoPso);
-
-    cmdList->SetDescriptorsHeap(&primeNormalMapSrvMemory);
-    cmdList->SetDescriptorsHeap(&primeRandomVectorSrvMemory);
-    cmdList->SetDescriptorsHeap(&primeAmbientMapSrvMemory);
-    
-    cmdList->SetRootConstantBufferView(0, *currFrame.get());
-    cmdList->SetRoot32BitConstant(1, 0, 0);
-
-    cmdList->SetRootDescriptorTable(2, &primeNormalMapSrvMemory);
-
-    cmdList->SetRootDescriptorTable(3, &primeRandomVectorSrvMemory);
-
-
-    cmdList->SetVBuffer(0, 0, nullptr);
-    cmdList->SetIBuffer(nullptr);
-    cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    cmdList->Draw(6, 1, 0, 0);
-
-
-    cmdList->TransitionBarrier(primeAmbientMap0, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    cmdList->FlushResourceBarriers();
-
-    BlurAmbientMap(cmdList, currFrame, blurCount);
-}
-
-void SharedSSAO::ClearAmbientMap(
-    const std::shared_ptr<GCommandList>& cmdList) const
-{
-    cmdList->TransitionBarrier(primeAmbientMap0, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    cmdList->FlushResourceBarriers();
-
-    float clearValue[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    cmdList->ClearRenderTarget(&primeAmbientMapRtvMemory, 0, clearValue);
-
-
-    cmdList->TransitionBarrier(primeAmbientMap0, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    cmdList->FlushResourceBarriers();
-}
-
-void SharedSSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList,
-                          const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame, const int blurCount)
-{
-    cmdList->SetPipelineState(mBlurPso);
-
-    cmdList->SetRootConstantBufferView(0, *currFrame.get());
-
-    for (int i = 0; i < blurCount; ++i)
-    {
-        BlurAmbientMap(cmdList, true);
-        BlurAmbientMap(cmdList, false);
-    }
-}
-
-void SharedSSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const bool horzBlur) const
-{
-    GTexture output;
-    size_t inputSrv;
-    size_t outputRtv;
-
-    if (horzBlur == true)
-    {
-        output = primeAmbientMap1;
-        inputSrv = 0;
-        outputRtv = 1;
-        cmdList->SetRoot32BitConstant(1, 1, 0);
-    }
-    else
-    {
-        output = primeAmbientMap0;
-        inputSrv = 1;
-        outputRtv = 0;
-        cmdList->SetRoot32BitConstant(1, 0, 0);
-    }
-
-    cmdList->TransitionBarrier(output, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    cmdList->FlushResourceBarriers();
-
-    float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    cmdList->ClearRenderTarget(&primeAmbientMapRtvMemory, outputRtv, clearValue);
-
-    cmdList->SetRenderTargets(1, &primeAmbientMapRtvMemory, outputRtv);
-
-    cmdList->SetRootDescriptorTable(2, &primeNormalMapSrvMemory);
-
-    cmdList->SetRootDescriptorTable(3, &primeAmbientMapSrvMemory, inputSrv);
-
-    // Draw fullscreen quad.
-    cmdList->SetVBuffer(0, 0, nullptr);
-    cmdList->SetIBuffer(nullptr);
-    cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    cmdList->Draw(6, 1, 0, 0);
-
-    cmdList->TransitionBarrier(output, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    cmdList->FlushResourceBarriers();
-}
-
-GTexture SharedSSAO::CreateNormalMap(const std::shared_ptr<GDevice>& device) const
-{
-    D3D12_RESOURCE_DESC texDesc;
-    ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
-    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    texDesc.Alignment = 0;
-    texDesc.Width = mRenderTargetWidth;
-    texDesc.Height = mRenderTargetHeight;
-    texDesc.DepthOrArraySize = 1;
-    texDesc.MipLevels = 1;
-    texDesc.Format = NormalMapFormat;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.SampleDesc.Quality = 0;
-    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-
-    float normalClearColor[] = {0.0f, 0.0f, 1.0f, 0.0f};
-    CD3DX12_CLEAR_VALUE optClear(NormalMapFormat, normalClearColor);
-
-    return GTexture(device, texDesc, L"SSAO NormalMap", TextureUsage::Normalmap, &optClear);
-}
-
-GTexture SharedSSAO::CreateAmbientMap(const std::shared_ptr<GDevice>& device) const
-{
-    D3D12_RESOURCE_DESC texDesc;
-    ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
-    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    texDesc.Alignment = 0;
-    texDesc.DepthOrArraySize = 1;
-    texDesc.MipLevels = 1;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.SampleDesc.Quality = 0;
-    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    texDesc.Width = mRenderTargetWidth;
-    texDesc.Height = mRenderTargetHeight;
-    texDesc.Format = AmbientMapFormat;
-
-    float ambientClearColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    auto optClear = CD3DX12_CLEAR_VALUE(AmbientMapFormat, ambientClearColor);
-
-    return GTexture(device, texDesc, L"SSAO AmbientMap", TextureUsage::Normalmap, &optClear);
-}
-
-GTexture SharedSSAO::CreateDepthMap(const std::shared_ptr<GDevice>& device) const
-{
-    D3D12_RESOURCE_DESC depthStencilDesc;
-    depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthStencilDesc.Alignment = 0;
-    depthStencilDesc.Width = mRenderTargetWidth;
-    depthStencilDesc.Height = mRenderTargetHeight;
-    depthStencilDesc.DepthOrArraySize = 1;
-    depthStencilDesc.MipLevels = 1;
-    depthStencilDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-    depthStencilDesc.SampleDesc.Count = 1;
-    depthStencilDesc.SampleDesc.Quality = 0;
-    depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-    D3D12_CLEAR_VALUE optClear;
-    optClear.Format = DXGI_FORMAT_D32_FLOAT;
-    optClear.DepthStencil.Depth = 1.0f;
-
-    return GTexture(device, depthStencilDesc, L"SSAO Depth Normal Map", TextureUsage::Depth, &optClear);
-}
-
-
-void SharedSSAO::BuildResources(const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice)
-{
-    // prime GPU
-    if (primeNormalMap.GetD3D12Resource() == nullptr)
-    {
-        primeNormalMap = CreateNormalMap(primeDevice);
-    }
-    else
-    {
-        GTexture::Resize(primeNormalMap, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (primeDepthMap.GetD3D12Resource() == nullptr)
-    {
-        primeDepthMap = CreateDepthMap(primeDevice);
-    }
-    else
-    {
-        GTexture::Resize(primeDepthMap, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (primeAmbientMap0.GetD3D12Resource() == nullptr)
-    {
-        primeAmbientMap0 = CreateAmbientMap(primeDevice);
-    }
-    else
-    {
-        GTexture::Resize(primeAmbientMap0, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (primeAmbientMap1.GetD3D12Resource() == nullptr)
-    {
-        primeAmbientMap1 = CreateAmbientMap(primeDevice);
-    }
-    else
-    {
-        GTexture::Resize(primeAmbientMap1, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    // shared resources
-    if (sharedNormalMap == nullptr)
-    {
-        sharedNormalMap = std::make_shared<GCrossAdapterResource>(primeNormalMap.GetD3D12ResourceDesc(), primeDevice, secondDevice,
-                                                                       L"Cross Adapter Normal Map");
-    }
-    else
-    {
-        sharedNormalMap->Resize(mRenderTargetWidth, mRenderTargetHeight);
-    }
-
-    if (sharedDepthMap == nullptr)
-    {
-        sharedDepthMap = std::make_shared<GCrossAdapterResource>(primeDepthMap.GetD3D12ResourceDesc(), primeDevice, secondDevice,
-                                                                       L"Cross Adapter Depth Map");
-    }
-    else
-    {
-        sharedDepthMap->Resize(mRenderTargetWidth, mRenderTargetHeight);
-    }
-
-    if (sharedAmbientMap == nullptr)
-    {
-        sharedAmbientMap = std::make_shared<GCrossAdapterResource>(primeAmbientMap0.GetD3D12ResourceDesc(), primeDevice, secondDevice,
-                                                                       L"Cross Adapter Ambient Map");
-    }
-    else
-    {
-        sharedAmbientMap->Resize(mRenderTargetWidth, mRenderTargetHeight);
-    }
-    
-    // secondary GPU resources
-    if (secondNormalMap.GetD3D12Resource() == nullptr)
-    {
-        secondNormalMap = CreateNormalMap(secondDevice);
-    }
-    else
-    {
-        GTexture::Resize(secondNormalMap, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (secondDepthMap.GetD3D12Resource() == nullptr)
-    {
-        secondDepthMap = CreateDepthMap(secondDevice);
-    }
-    else
-    {
-        GTexture::Resize(secondDepthMap, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (secondAmbientMap0.GetD3D12Resource() == nullptr)
-    {
-        secondAmbientMap0 = CreateAmbientMap(secondDevice);
-    }
-    else
-    {
-        GTexture::Resize(secondAmbientMap0, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-
-    if (secondAmbientMap1.GetD3D12Resource() == nullptr)
-    {
-        secondAmbientMap1 = CreateAmbientMap(secondDevice);
-    }
-    else
-    {
-        GTexture::Resize(secondAmbientMap1, mRenderTargetWidth, mRenderTargetHeight, 1);
-    }
-}
-
-void SharedSSAO::BuildRandomVectorTexture(const GTexture& texture, const std::shared_ptr<GCommandList>& cmdList)
-{
-    std::vector<Vector4> data;
-    data.resize(256 * 256);
-
-    for (int i = 0; i < 256; ++i)
-    {
-        for (int j = 0; j < 256; ++j)
-        {
-            // Random vector in [0,1].  We will decompress in shader to [-1,1].
-            Vector3 v(MathHelper::RandF(), MathHelper::RandF(), MathHelper::RandF());
-            data[i * 256 + j] = Vector4(v.x, v.y, v.z, 0.0f);
-        }
-    }
-
-    D3D12_SUBRESOURCE_DATA subResourceData = {};
-    subResourceData.pData = data.data();
-    subResourceData.RowPitch = 256 * sizeof(Vector4);
-    subResourceData.SlicePitch = subResourceData.RowPitch * 256;
-
-    cmdList->TransitionBarrier(texture.GetD3D12Resource(), D3D12_RESOURCE_STATE_COPY_DEST);
-    cmdList->FlushResourceBarriers();
-
-    cmdList->UpdateSubresource(texture, &subResourceData, 1);
-
-    cmdList->TransitionBarrier(texture.GetD3D12Resource(), D3D12_RESOURCE_STATE_GENERIC_READ);
-    cmdList->FlushResourceBarriers();
-}
-
-void SharedSSAO::BuildOffsetVectors()
-{
-    // Start with 14 uniformly distributed vectors.  We choose the 8 corners of the cube
-    // and the 6 center points along each cube face.  We always alternate the points on 
-    // opposites sides of the cubes.  This way we still get the vectors spread out even
-    // if we choose to use less than 14 samples.
-
-    // 8 cube corners
-    mOffsets[0] = Vector4(+1.0f, +1.0f, +1.0f, 0.0f);
-    mOffsets[1] = Vector4(-1.0f, -1.0f, -1.0f, 0.0f);
-
-    mOffsets[2] = Vector4(-1.0f, +1.0f, +1.0f, 0.0f);
-    mOffsets[3] = Vector4(+1.0f, -1.0f, -1.0f, 0.0f);
-
-    mOffsets[4] = Vector4(+1.0f, +1.0f, -1.0f, 0.0f);
-    mOffsets[5] = Vector4(-1.0f, -1.0f, +1.0f, 0.0f);
-
-    mOffsets[6] = Vector4(-1.0f, +1.0f, -1.0f, 0.0f);
-    mOffsets[7] = Vector4(+1.0f, -1.0f, +1.0f, 0.0f);
-
-    // 6 centers of cube faces
-    mOffsets[8] = Vector4(-1.0f, 0.0f, 0.0f, 0.0f);
-    mOffsets[9] = Vector4(+1.0f, 0.0f, 0.0f, 0.0f);
-
-    mOffsets[10] = Vector4(0.0f, -1.0f, 0.0f, 0.0f);
-    mOffsets[11] = Vector4(0.0f, +1.0f, 0.0f, 0.0f);
-
-    mOffsets[12] = Vector4(0.0f, 0.0f, -1.0f, 0.0f);
-    mOffsets[13] = Vector4(0.0f, 0.0f, +1.0f, 0.0f);
-
-    for (auto& mOffset : mOffsets)
-    {
-        // Create random lengths in [0.25, 1.0].
-        float s = MathHelper::RandF(0.25f, 1.0f);
-        mOffset.Normalize();
-        mOffset = s * mOffset;
-    }
-}
-
-void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice,
-    const std::shared_ptr<GDevice>& secondDevice,
-    const UINT width, const UINT height)
-{
-    this->primeDevice = primeDevice;
-    this->secondDevice = secondDevice;
-
-    // prime resources
-    primeNormalMapSrvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    primeNormalMapRtvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
-    primeDepthMapSrvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    primeDepthMapDsvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
-    primeRandomVectorSrvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    primeAmbientMapSrvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
-    primeAmbientMapRtvMemory = primeDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2);
-
-    // secondary resources
-    secondNormalMapSrvMemory = secondDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    secondDepthMapSrvMemory = secondDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    secondRandomVectorSrvMemory = secondDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    secondAmbientMapRtvMemory = secondDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2);
-    secondAmbientMapSrvMemory = secondDevice->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
-    
-    ssaoPrimeRootSignature = std::make_shared<GRootSignature>();
-    ssaoSecondRootSignature = std::make_shared<GRootSignature>();
+    this->device = Device;
+    normalMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    normalMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
+    depthMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    depthMapDSV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+    randomVectorMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    ambientMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
+    ambientMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2);
+
+    ssaoRootSignature = std::make_shared<GRootSignature>();
 
     CD3DX12_DESCRIPTOR_RANGE texTable0;
     texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
@@ -585,15 +33,10 @@ void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice,
     CD3DX12_DESCRIPTOR_RANGE texTable1;
     texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
 
-    ssaoPrimeRootSignature->AddConstantBufferParameter(0);
-    ssaoPrimeRootSignature->AddConstantParameter(1, 1);
-    ssaoPrimeRootSignature->AddDescriptorParameter(&texTable0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    ssaoPrimeRootSignature->AddDescriptorParameter(&texTable1, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-
-    ssaoSecondRootSignature->AddConstantBufferParameter(0);
-    ssaoSecondRootSignature->AddConstantParameter(1, 1);
-    ssaoSecondRootSignature->AddDescriptorParameter(&texTable0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    ssaoSecondRootSignature->AddDescriptorParameter(&texTable1, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    ssaoRootSignature->AddConstantBufferParameter(0);
+    ssaoRootSignature->AddConstantParameter(1, 1);
+    ssaoRootSignature->AddDescriptorParameter(&texTable0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    ssaoRootSignature->AddDescriptorParameter(&texTable1, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
         0, // shaderRegister
@@ -634,16 +77,206 @@ void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice,
 
     for (auto&& sampler : staticSamplers)
     {
-        ssaoPrimeRootSignature->AddStaticSampler(sampler);
-        ssaoSecondRootSignature->AddStaticSampler(sampler);
+        ssaoRootSignature->AddStaticSampler(sampler);
+    }
+    ssaoRootSignature->Initialize(device);
+
+    BuildOffsetVectors();
+    BuildPSO(layout);
+}
+
+void SSAOResources::OnResize(uint32_t width, uint32_t height)
+{
+    D3D12_RESOURCE_DESC texDesc;
+    ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
+    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    texDesc.Alignment = 0;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.DepthOrArraySize = 1;
+    texDesc.MipLevels = 1;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    if (normalMap.GetD3D12Resource() == nullptr)
+    {
+        texDesc.Format = NormalMapFormat;
+        texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        float normalClearColor[] = {0.0f, 0.0f, 1.0f, 0.0f};
+        CD3DX12_CLEAR_VALUE optClear(NormalMapFormat, normalClearColor);
+
+        normalMap = GTexture(device, texDesc, L"SSAO NormalMap " + device->GetName(), TextureUsage::Normalmap, &optClear);
+    }
+    else
+    {
+        GTexture::Resize(normalMap, width, height, 1);
     }
 
-    ssaoPrimeRootSignature->Initialize(primeDevice);
-    ssaoSecondRootSignature->Initialize(secondDevice);
-    
-    OnResize(width, height);
-    BuildOffsetVectors();
+    if (depthMap.GetD3D12Resource() == nullptr)
+    {
+        texDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+        texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
+        D3D12_CLEAR_VALUE optClear;
+        optClear.Format = DXGI_FORMAT_D32_FLOAT;
+        optClear.DepthStencil.Depth = 1.0f;
+
+        depthMap = GTexture(device, texDesc, L"SSAO Depth Normal Map " + device->GetName(), TextureUsage::Depth, &optClear);
+    }
+    else
+    {
+        GTexture::Resize(depthMap, width, height, 1);
+    }
+
+    if (ambientMap0.GetD3D12Resource() == nullptr)
+    {
+        texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        texDesc.Format = AmbientMapFormat;
+
+        float ambientClearColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+        auto optClear = CD3DX12_CLEAR_VALUE(AmbientMapFormat, ambientClearColor);
+
+        ambientMap0 = GTexture(device, texDesc, L"SSAO AmbientMap0", TextureUsage::Normalmap, &optClear);
+        ambientMap1 = GTexture(device, texDesc, L"SSAO AmbientMap1", TextureUsage::Normalmap, &optClear);
+    }
+    else
+    {
+        GTexture::Resize(ambientMap0, width, height, 1);
+        GTexture::Resize(ambientMap1, width, height, 1);
+    }
+
+    RebuildDescriptors();
+}
+
+void SSAOResources::RebuildDescriptors() const
+{
+    // Prime GPU
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    dsvDesc.Texture2D.MipSlice = 0;
+    depthMap.CreateDepthStencilView(&dsvDesc, &depthMapDSV);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Format = NormalMapFormat;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.MipLevels = 1;
+    normalMap.CreateShaderResourceView(&srvDesc, &normalMapSRV);
+
+    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthMap.CreateShaderResourceView(&srvDesc, &depthMapSRV);
+
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    randomVectorMap.CreateShaderResourceView(&srvDesc, &randomVectorMapSRV);
+
+    srvDesc.Format = AmbientMapFormat;
+    ambientMap0.CreateShaderResourceView(&srvDesc, &ambientMapSRV);
+    ambientMap1.CreateShaderResourceView(&srvDesc, &ambientMapSRV, 1);
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Format = NormalMapFormat;
+    rtvDesc.Texture2D.MipSlice = 0;
+    rtvDesc.Texture2D.PlaneSlice = 0;
+    normalMap.CreateRenderTargetView(&rtvDesc, &normalMapRTV);
+
+    rtvDesc.Format = AmbientMapFormat;
+    ambientMap0.CreateRenderTargetView(&rtvDesc, &ambientMapRTV);
+    ambientMap1.CreateRenderTargetView(&rtvDesc, &ambientMapRTV, 1);
+}
+
+void SSAOResources::BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout)
+{
+    RenderModeFactory::LoadDefaultShaders();
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC basePsoDesc;
+
+    ZeroMemory(&basePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    basePsoDesc.InputLayout = layout;
+    basePsoDesc.pRootSignature = ssaoRootSignature->GetNativeSignature().Get();
+    basePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    basePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    basePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    basePsoDesc.SampleMask = UINT_MAX;
+    basePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    basePsoDesc.NumRenderTargets = 1;
+    basePsoDesc.RTVFormats[0] = GetSRGBFormat(BackBufferFormat);
+    basePsoDesc.SampleDesc.Count = 1;
+    basePsoDesc.SampleDesc.Quality = 0;
+    basePsoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
+    ssaoPSO = std::make_shared<GraphicPSO>(RenderMode::Ssao);
+    ssaoPSO->SetPsoDesc(basePsoDesc);
+    ssaoPSO->SetRootSignature(*ssaoRootSignature.get());
+    ssaoPSO->SetInputLayout({nullptr, 0});
+    ssaoPSO->SetShader(RenderModeFactory::GetShader("ssaoVS").get());
+    ssaoPSO->SetShader(RenderModeFactory::GetShader("ssaoPS").get());
+    ssaoPSO->SetRTVFormat(0, AmbientMapFormat);
+    ssaoPSO->SetSampleCount(1);
+    ssaoPSO->SetSampleQuality(0);
+    ssaoPSO->SetDSVFormat(DXGI_FORMAT_UNKNOWN);
+    auto depthStencilDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    depthStencilDesc.DepthEnable = false;
+    depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    ssaoPSO->SetDepthStencilState(depthStencilDesc);
+    ssaoPSO->Initialize(device);
+
+
+    blurPSO = std::make_shared<GraphicPSO>(RenderMode::SsaoBlur);
+    blurPSO->SetPsoDesc(ssaoPSO->GetPsoDescription());
+    blurPSO->SetShader(RenderModeFactory::GetShader("ssaoBlurVS").get());
+    blurPSO->SetShader(RenderModeFactory::GetShader("ssaoBlurPS").get());
+    blurPSO->Initialize(device);
+}
+
+void SSAOResources::BuildOffsetVectors()
+{
+    // Start with 14 uniformly distributed vectors.  We choose the 8 corners of the cube
+    // and the 6 center points along each cube face.  We always alternate the points on 
+    // opposites sides of the cubes.  This way we still get the vectors spread out even
+    // if we choose to use less than 14 samples.
+
+    // 8 cube corners
+    offsetsVectors[0] = Vector4(+1.0f, +1.0f, +1.0f, 0.0f);
+    offsetsVectors[1] = Vector4(-1.0f, -1.0f, -1.0f, 0.0f);
+
+    offsetsVectors[2] = Vector4(-1.0f, +1.0f, +1.0f, 0.0f);
+    offsetsVectors[3] = Vector4(+1.0f, -1.0f, -1.0f, 0.0f);
+
+    offsetsVectors[4] = Vector4(+1.0f, +1.0f, -1.0f, 0.0f);
+    offsetsVectors[5] = Vector4(-1.0f, -1.0f, +1.0f, 0.0f);
+
+    offsetsVectors[6] = Vector4(-1.0f, +1.0f, -1.0f, 0.0f);
+    offsetsVectors[7] = Vector4(+1.0f, -1.0f, +1.0f, 0.0f);
+
+    // 6 centers of cube faces
+    offsetsVectors[8] = Vector4(-1.0f, 0.0f, 0.0f, 0.0f);
+    offsetsVectors[9] = Vector4(+1.0f, 0.0f, 0.0f, 0.0f);
+
+    offsetsVectors[10] = Vector4(0.0f, -1.0f, 0.0f, 0.0f);
+    offsetsVectors[11] = Vector4(0.0f, +1.0f, 0.0f, 0.0f);
+
+    offsetsVectors[12] = Vector4(0.0f, 0.0f, -1.0f, 0.0f);
+    offsetsVectors[13] = Vector4(0.0f, 0.0f, +1.0f, 0.0f);
+
+    for (auto& mOffset : offsetsVectors)
+    {
+        // Create random lengths in [0.25, 1.0].
+        float s = MathHelper::RandF(0.25f, 1.0f);
+        mOffset.Normalize();
+        mOffset = s * mOffset;
+    }
+
+    BuildRandomTexture();
+}
+
+void SSAOResources::BuildRandomTexture()
+{
     D3D12_RESOURCE_DESC texDesc;
     ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
     texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -658,34 +291,252 @@ void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice,
     texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    primeRandomVectorMap = GTexture(primeDevice, texDesc, L"SSAO Random Vector Map", TextureUsage::Normalmap);
-    secondRandomVectorMap = GTexture(secondDevice, texDesc, L"SSAO Random Vector Map", TextureUsage::Normalmap);
-    
-    auto primeCommandQueue = primeDevice->GetCommandQueue();
-    auto secondCommandQueue = secondDevice->GetCommandQueue();
+    randomVectorMap = GTexture(device, texDesc, L"SSAO Random Vector Map", TextureUsage::Normalmap);
 
-    auto primeCommandList = primeCommandQueue->GetCommandList();
-    auto secondCommandList = secondCommandQueue->GetCommandList();
-    
-    BuildRandomVectorTexture(primeRandomVectorMap, primeCommandList);
-    BuildRandomVectorTexture(secondRandomVectorMap, secondCommandList);
+    auto queue = device->GetCommandQueue();
+    auto cmdList = queue->GetCommandList();
 
-    primeCommandQueue->ExecuteCommandList(primeCommandList);
-    secondCommandQueue->ExecuteCommandList(secondCommandList);
+    std::vector<Vector4> data;
+    data.resize(256 * 256);
 
-    primeDevice->Flush();
-    secondDevice->Flush();
+    for (int i = 0; i < 256; ++i)
+    {
+        for (int j = 0; j < 256; ++j)
+        {
+            // Random vector in [0,1].  We will decompress in shader to [-1,1].
+            Vector3 v(MathHelper::RandF(), MathHelper::RandF(), MathHelper::RandF());
+            data[i * 256 + j] = Vector4(v.x, v.y, v.z, 0.0f);
+        }
+    }
+
+    D3D12_SUBRESOURCE_DATA subResourceData = {};
+    subResourceData.pData = data.data();
+    subResourceData.RowPitch = 256 * sizeof(Vector4);
+    subResourceData.SlicePitch = subResourceData.RowPitch * 256;
+
+    cmdList->TransitionBarrier(randomVectorMap.GetD3D12Resource(), D3D12_RESOURCE_STATE_COPY_DEST);
+    cmdList->FlushResourceBarriers();
+
+    cmdList->UpdateSubresource(randomVectorMap, &subResourceData, 1);
+
+    cmdList->TransitionBarrier(randomVectorMap.GetD3D12Resource(), D3D12_RESOURCE_STATE_GENERIC_READ);
+    cmdList->FlushResourceBarriers();
+
+    queue->ExecuteCommandList(cmdList);
+    device->Flush();
 }
 
-/*void SharedSSAO::CopyDataFromPrimeToShared(const std::shared_ptr<GCommandList>& cmdList)
+void SSAOCrossResources::Initialize(const SSAOResources& Resources, const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice)
 {
-    auto& source = primeNormalMap;
-    auto& destination = sharedNormalMap;
-}*/
+    sharedNormalMap = std::make_shared<GCrossAdapterResource>(Resources.GetNormalMap().GetD3D12ResourceDesc(), primeDevice, secondDevice);
+    sharedDepthMap = std::make_shared<GCrossAdapterResource>(Resources.GetDepthMap().GetD3D12ResourceDesc(), primeDevice, secondDevice,
+                                                             L"Cross Adapter Depth Map");
+    sharedAmbientMap = std::make_shared<GCrossAdapterResource>(Resources.GetAmbientMap().GetD3D12ResourceDesc(), primeDevice, secondDevice,
+                                                               L"Cross Adapter Ambient Map");
+}
+
+void SSAOCrossResources::OnResize(uint32_t width, uint32_t height) const
+{
+    sharedNormalMap->Resize(width, height);
+    sharedDepthMap->Resize(width, height);
+    sharedAmbientMap->Resize(width, height);
+}
+
+SharedSSAO::SharedSSAO()
+{
+}
+
+SharedSSAO::~SharedSSAO() = default;
 
 
-// void SSAO::PrimeDrawCopyNormalDepth() -> draw normal+depth & copy to shared
-// void SSAO::PrimeCopyAmbientMap() -> copy from shared to prime
+UINT SharedSSAO::SsaoMapWidth() const
+{
+    return RenderTargetWidth / 2;
+}
 
-// void SSAO::SecondCopyNormalDepth() -> copy from shared to second
-// void SSAO::SecondDrawCopyAmbient() -> draw ambient & copy to shared
+UINT SharedSSAO::SsaoMapHeight() const
+{
+    return RenderTargetHeight / 2;
+}
+
+std::vector<float> SharedSSAO::CalcGaussWeights(const float sigma)
+{
+    float twoSigma2 = 2.0f * sigma * sigma;
+
+    // Estimate the blur radius based on sigma since sigma controls the "width" of the bell curve.
+    // For example, for sigma = 3, the width of the bell curve is 
+    int blurRadius = static_cast<int>(ceil(2.0f * sigma));
+
+    assert(blurRadius <= MaxBlurRadius);
+
+    std::vector<float> weights;
+    weights.resize(2 * blurRadius + 1);
+
+    float weightSum = 0.0f;
+
+    for (int i = -blurRadius; i <= blurRadius; ++i)
+    {
+        float x = static_cast<float>(i);
+
+        weights[i + blurRadius] = expf(-x * x / twoSigma2);
+
+        weightSum += weights[i + blurRadius];
+    }
+
+    // Divide by the sum so all the weights add up to 1.0.
+    for (int i = 0; i < weights.size(); ++i)
+    {
+        weights[i] /= weightSum;
+    }
+
+    return weights;
+}
+
+
+void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice, const std::shared_ptr<GDevice>& secondDevice, const D3D12_INPUT_LAYOUT_DESC& layout, UINT width, UINT height)
+{
+    primeResources.Initialize(primeDevice, layout);
+    primeResources.OnResize(width, height);
+    
+    secondResources.Initialize(secondDevice, layout);
+    secondResources.OnResize(width, height);
+    
+    crossResources.Initialize(primeResources, primeDevice, secondDevice);
+    crossResources.OnResize(width, height);
+    OnResize(width, height);
+}
+
+void SharedSSAO::OnResize(const UINT newWidth, const UINT newHeight)
+{
+    if (RenderTargetWidth != newWidth || RenderTargetHeight != newHeight)
+    {
+        RenderTargetWidth = newWidth;
+        RenderTargetHeight = newHeight;
+
+        mViewport.TopLeftX = 0.0f;
+        mViewport.TopLeftY = 0.0f;
+        mViewport.Width = RenderTargetWidth;
+        mViewport.Height = RenderTargetHeight;
+        mViewport.MinDepth = 0.0f;
+        mViewport.MaxDepth = 1.0f;
+
+        mScissorRect = {0, 0, static_cast<int>(RenderTargetWidth), static_cast<int>(RenderTargetHeight)};
+
+        primeResources.OnResize(newWidth, newHeight);
+        secondResources.OnResize(newWidth, newHeight);
+        crossResources.OnResize(newWidth, newHeight);
+    }
+}
+
+void SharedSSAO::ComputeSsao(
+    const std::shared_ptr<GCommandList>& cmdList,
+    const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame,
+    const SSAOResources& Resources,
+    const int blurCount)
+{
+    cmdList->SetViewports(&mViewport, 1);
+    cmdList->SetScissorRects(&mScissorRect, 1);
+
+    cmdList->TransitionBarrier(Resources.GetAmbientMap(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+    cmdList->FlushResourceBarriers();
+
+
+    float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    cmdList->ClearRenderTarget(Resources.GetAmbientMapRTV(), 0, clearValue);
+
+    cmdList->SetRenderTargets(1, Resources.GetAmbientMapRTV(), 0);
+
+    cmdList->SetRootSignature(Resources.GetRootSignature());
+    cmdList->SetPipelineState(Resources.GetSSAOPSO());
+
+    cmdList->SetDescriptorsHeap(Resources.GetAmbientMapSRV());
+
+    cmdList->SetRootConstantBufferView(0, *currFrame.get());
+    cmdList->SetRoot32BitConstant(1, 0, 0);
+
+    cmdList->SetRootDescriptorTable(2, Resources.GetNormalMapSRV());
+
+    cmdList->SetRootDescriptorTable(3, Resources.GetRandomVectorSRV());
+
+
+    cmdList->SetVBuffer(0, 0, nullptr);
+    cmdList->SetIBuffer(nullptr);
+    cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->Draw(6, 1, 0, 0);
+
+
+    cmdList->TransitionBarrier(Resources.GetAmbientMap(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    cmdList->FlushResourceBarriers();
+
+    BlurAmbientMap(cmdList, Resources, currFrame, blurCount);
+}
+
+void SharedSSAO::ClearAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources)
+{
+    cmdList->TransitionBarrier(Resources.GetAmbientMap(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+    cmdList->FlushResourceBarriers();
+
+    float clearValue[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    cmdList->ClearRenderTarget(Resources.GetAmbientMapRTV(), 0, clearValue);
+
+
+    cmdList->TransitionBarrier(Resources.GetAmbientMap(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    cmdList->FlushResourceBarriers();
+}
+
+void SharedSSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources,
+                                const std::shared_ptr<ConstantUploadBuffer<SsaoConstants>>& currFrame, const int blurCount)
+{
+    cmdList->SetPipelineState(Resources.GetBlurPSO());
+
+    cmdList->SetRootConstantBufferView(0, *currFrame.get());
+
+    for (int i = 0; i < blurCount; ++i)
+    {
+        BlurAmbientMap(cmdList, Resources, true);
+        BlurAmbientMap(cmdList, Resources, false);
+    }
+}
+
+void SharedSSAO::BlurAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources, const bool horzBlur)
+{
+    GTexture output;
+    size_t inputSrv;
+    size_t outputRtv;
+
+    if (horzBlur == true)
+    {
+        output = Resources.GetBluredAmbientMap();
+        inputSrv = 0;
+        outputRtv = 1;
+        cmdList->SetRoot32BitConstant(1, 1, 0);
+    }
+    else
+    {
+        output = Resources.GetAmbientMap();
+        inputSrv = 1;
+        outputRtv = 0;
+        cmdList->SetRoot32BitConstant(1, 0, 0);
+    }
+
+    cmdList->TransitionBarrier(output, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    cmdList->FlushResourceBarriers();
+
+    float clearValue[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    cmdList->ClearRenderTarget(Resources.GetAmbientMapRTV(), outputRtv, clearValue);
+
+    cmdList->SetRenderTargets(1, Resources.GetAmbientMapRTV(), outputRtv);
+
+    cmdList->SetRootDescriptorTable(2, Resources.GetNormalMapSRV());
+
+    cmdList->SetRootDescriptorTable(3, Resources.GetAmbientMapSRV(), inputSrv);
+
+    // Draw fullscreen quad.
+    cmdList->SetVBuffer(0, 0, nullptr);
+    cmdList->SetIBuffer(nullptr);
+    cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->Draw(6, 1, 0, 0);
+
+    cmdList->TransitionBarrier(output, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    cmdList->FlushResourceBarriers();
+}

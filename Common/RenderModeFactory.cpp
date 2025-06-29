@@ -212,9 +212,9 @@ void RenderModeFactory::LoadDefaultPSO(std::shared_ptr<GDevice> device, std::sha
     }
 }
 
-void RenderModeFactory::LoadDefaultShaders() const
+void RenderModeFactory::LoadDefaultShaders()
 {
-    if (shaders.size() > 0) return;
+    if (!shaders.empty()) return;
 
     constexpr D3D_SHADER_MACRO defines[] =
     {
@@ -288,7 +288,7 @@ void RenderModeFactory::LoadDefaultShaders() const
     }
 }
 
-std::shared_ptr<GShader> RenderModeFactory::GetShader(const std::string& name)
+const std::shared_ptr<GShader>& RenderModeFactory::GetShader(const std::string& name)
 {
     return shaders[name];
 }

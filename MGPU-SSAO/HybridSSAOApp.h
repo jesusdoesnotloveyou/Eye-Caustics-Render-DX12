@@ -80,6 +80,7 @@ protected:
     custom_unordered_map<std::wstring, std::shared_ptr<GModel>> models = MemoryAllocator::CreateUnorderedMap<
         std::wstring, std::shared_ptr<GModel>>();
     std::shared_ptr<GRootSignature> primeDeviceSignature;
+    std::shared_ptr<GRootSignature> secondDeviceSignature;
     std::vector<D3D12_INPUT_ELEMENT_DESC> defaultInputLayout{};
     GDescriptor srvTexturesMemory;
     RenderModeFactory defaultPrimePipelineResources;
@@ -101,7 +102,7 @@ protected:
 
     std::shared_ptr<UILayer> UIPath;
     std::shared_ptr<ShadowMap> shadowPath;
-    std::shared_ptr<SharedSSAO> ambientPrimePath;
+    std::shared_ptr<SharedSSAO> ambientPass;
     std::shared_ptr<SSAA> antiAliasingPrimePath;
 
     custom_vector<std::shared_ptr<GameObject>> gameObjects = MemoryAllocator::CreateVector<std::shared_ptr<

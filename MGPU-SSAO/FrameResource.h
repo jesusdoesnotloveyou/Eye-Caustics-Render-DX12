@@ -20,7 +20,9 @@ struct FrameResource
     GDescriptor BackBufferRTVMemory;
 
     std::shared_ptr<ConstantUploadBuffer<PassConstants>> PrimePassConstantUploadBuffer;
-    std::shared_ptr<ConstantUploadBuffer<SsaoConstants>> SsaoConstantUploadBuffer;
+    std::shared_ptr<ConstantUploadBuffer<SsaoConstants>> PrimeSsaoConstantUploadBuffer;
+    std::shared_ptr<ConstantUploadBuffer<SsaoConstants>> SecondSsaoConstantUploadBuffer;
+    
     std::shared_ptr<StructuredUploadBuffer<MaterialConstants>> MaterialBuffer;
 
 
