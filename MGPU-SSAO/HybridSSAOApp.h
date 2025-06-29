@@ -92,13 +92,7 @@ protected:
     UINT pathMapShow = 0;
     //off, shadowMap, ssaoMap
     const UINT maxPathMap = 3;
-
-    std::shared_ptr<GRootSignature> ssaoPrimeRootSignature;
-    GTexture secondDeviceUITexture;
-    GDescriptor secondDeviceUIBackBufferRTV;
-    std::shared_ptr<GCrossAdapterResource> crossAdapterUITexture;
-    GTexture primeDeviceUITexture;
-    GDescriptor primeUIBackBufferSRV;
+    
 
     std::shared_ptr<UILayer> UIPath;
     std::shared_ptr<ShadowMap> shadowPath;

@@ -169,27 +169,33 @@ void RenderModeFactory::LoadDefaultPSO(std::shared_ptr<GDevice> device, std::sha
         uiPSO->SetRenderTargetBlendState(0, desc);
     }
 
+    if (ssaoRootSignature != nullptr)
+    {
+        auto ssaoPSO = std::make_shared<GraphicPSO>(RenderMode::Ssao);
+        ssaoPSO->SetPsoDesc(basePsoDesc);
+        ssaoPSO->SetRootSignature(*ssaoRootSignature.get());
+        ssaoPSO->SetInputLayout({nullptr, 0});
+        ssaoPSO->SetShader(shaders["ssaoVS"].get());
+        ssaoPSO->SetShader(shaders["ssaoPS"].get());
+        ssaoPSO->SetRTVFormat(0, ambientMapFormat);
+        ssaoPSO->SetSampleCount(1);
+        ssaoPSO->SetSampleQuality(0);
+        ssaoPSO->SetDSVFormat(DXGI_FORMAT_UNKNOWN);
+        depthStencilDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+        depthStencilDesc.DepthEnable = false;
+        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        ssaoPSO->SetDepthStencilState(depthStencilDesc);
 
-    auto ssaoPSO = std::make_shared<GraphicPSO>(RenderMode::Ssao);
-    ssaoPSO->SetPsoDesc(basePsoDesc);
-    ssaoPSO->SetRootSignature(*ssaoRootSignature.get());
-    ssaoPSO->SetInputLayout({nullptr, 0});
-    ssaoPSO->SetShader(shaders["ssaoVS"].get());
-    ssaoPSO->SetShader(shaders["ssaoPS"].get());
-    ssaoPSO->SetRTVFormat(0, ambientMapFormat);
-    ssaoPSO->SetSampleCount(1);
-    ssaoPSO->SetSampleQuality(0);
-    ssaoPSO->SetDSVFormat(DXGI_FORMAT_UNKNOWN);
-    depthStencilDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    depthStencilDesc.DepthEnable = false;
-    depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-    ssaoPSO->SetDepthStencilState(depthStencilDesc);
 
+        auto ssaoBlurPSO = std::make_shared<GraphicPSO>(RenderMode::SsaoBlur);
+        ssaoBlurPSO->SetPsoDesc(ssaoPSO->GetPsoDescription());
+        ssaoBlurPSO->SetShader(shaders["ssaoBlurVS"].get());
+        ssaoBlurPSO->SetShader(shaders["ssaoBlurPS"].get());
 
-    auto ssaoBlurPSO = std::make_shared<GraphicPSO>(RenderMode::SsaoBlur);
-    ssaoBlurPSO->SetPsoDesc(ssaoPSO->GetPsoDescription());
-    ssaoBlurPSO->SetShader(shaders["ssaoBlurVS"].get());
-    ssaoBlurPSO->SetShader(shaders["ssaoBlurPS"].get());
+        
+        PSO[ssaoPSO->GetRenderMode()] = std::move(ssaoPSO);
+        PSO[ssaoBlurPSO->GetRenderMode()] = std::move(ssaoBlurPSO);
+    }
 
     PSO[opaquePSO->GetRenderMode()] = std::move(opaquePSO);
     PSO[transperentPSO->GetRenderMode()] = std::move(transperentPSO);
@@ -199,8 +205,6 @@ void RenderModeFactory::LoadDefaultPSO(std::shared_ptr<GDevice> device, std::sha
     PSO[shadowMapDropPSO->GetRenderMode()] = std::move(shadowMapDropPSO);
     PSO[drawNormalsPso->GetRenderMode()] = std::move(drawNormalsPso);
     PSO[drawNormalsDropPso->GetRenderMode()] = std::move(drawNormalsDropPso);
-    PSO[ssaoPSO->GetRenderMode()] = std::move(ssaoPSO);
-    PSO[ssaoBlurPSO->GetRenderMode()] = std::move(ssaoBlurPSO);
     PSO[debugPso->GetRenderMode()] = std::move(debugPso);
     PSO[quadPso->GetRenderMode()] = std::move(quadPso);
     PSO[noisePSO->GetRenderMode()] = std::move(noisePSO);
