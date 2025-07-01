@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "BenchmarkService.h"
-#include "../LogService.h"
+#include "LogService.h"
 
 const std::shared_ptr<BenchmarkState>& BenchmarkService::GetCurrentState() const
 {

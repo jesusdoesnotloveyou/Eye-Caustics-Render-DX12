@@ -12,7 +12,7 @@
 #include "Light.h"
 #include "UILayer.h"
 #include "Services/LogService.h"
-#include "Services/Benchmark/BenchmarkService.h"
+#include "Services/BenchmarkService.h"
 
 class HybridSSAOApp final :
     public Common::D3DApp

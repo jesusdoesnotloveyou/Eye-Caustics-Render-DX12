@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-#include "AssetsLoader.h"
+#include "..\AssetsLoader.h"
 
 void LogService::PushMessage(const std::wstring& message)
 {

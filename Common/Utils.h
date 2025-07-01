@@ -1,6 +1,6 @@
 ﻿#pragma once
-#include "LogService.h"
-#include "Benchmark/States/BenchmarkState.h"
+#include "Services/LogService.h"
+#include "Services/States/BenchmarkState.h"
 
 class LogService;
 

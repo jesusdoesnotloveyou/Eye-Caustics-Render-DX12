@@ -13,7 +13,7 @@
 #include "SkyBox.h"
 #include "Transform.h"
 #include "Window.h"
-#include "Services/Benchmark/States/WaitState.h"
+#include "Services/States/WaitState.h"
 
 HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance)
 {
