@@ -202,6 +202,9 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Rotater.h" />
+    <ClInclude Include="Services\Benchmark\States\WaitState.h" />
+    <ClInclude Include="Services\LogService.h" />
+    <ClInclude Include="Services\Utils.h" />
     <ClInclude Include="ShaderBuffersData.h" />
     <ClInclude Include="RenderModeFactory.h" />
     <ClInclude Include="ShadowMap.h" />
@@ -243,6 +246,10 @@
     </ClCompile>
     <ClCompile Include="Rotater.cpp" />
     <ClCompile Include="RenderModeFactory.cpp" />
+    <ClCompile Include="Services\Benchmark\States\WaitState.cpp">
+    </ClCompile>
+    <ClCompile Include="Services\LogService.cpp">
+    </ClCompile>
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SkyBox.cpp" />
     <ClCompile Include="SplineController.cpp" />

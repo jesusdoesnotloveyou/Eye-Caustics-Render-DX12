@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{9c7aa41e-e73e-4d27-bdbe-1d1209a6f6b7}</ProjectGuid>
+    <ProjectGuid>{2c7aa41e-e73e-4d29-bdbe-1d1209a6f6b2}</ProjectGuid>
     <RootNamespace>SSAOMultiGPU</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>

@@ -11,8 +11,10 @@
 #include "GDeviceFactory.h"
 #include "Light.h"
 #include "UILayer.h"
+#include "Services/LogService.h"
+#include "Services/Benchmark/BenchmarkService.h"
 
-class HybridSSAOApp :
+class HybridSSAOApp final :
     public Common::D3DApp
 {
 public:
@@ -22,6 +24,10 @@ public:
     bool Initialize() override;
 
     int Run() override;
+
+    USHORT GetBlurCount() const { return blurCount; }
+    void SetBlurPassCount(const USHORT blurCount) { this->blurCount = blurCount; }
+    void SwitchDevice();
 
 protected:
     void Update(const GameTimer& gt) override;
@@ -39,8 +45,6 @@ protected:
     void PopulateDebugCommands(const std::shared_ptr<GCommandList>& cmdList);
     void Draw(const GameTimer& gt) override;
 
-    void NewDraw(const GameTimer& gt);
-
     void InitDevices();
     void InitFrameResource();
     void InitRootSignature();
@@ -53,8 +57,7 @@ protected:
     void MipMasGenerate();
     void SortGO();
     void CreateGO();
-    void CalculateFrameStats() override;
-    void LogWriting();
+    void OnApplicationExit();
     void UpdateMaterials() const;
     void UpdateShadowTransform(const GameTimer& gt);
     void UpdateShadowPassCB(const GameTimer& gt);
@@ -65,10 +68,11 @@ protected:
     void Flush() override;
     LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) override;
 
+    LogService logs;
+    BenchmarkService benchmark;
     std::shared_ptr<GDevice> primeDevice;
     std::shared_ptr<GDevice> secondDevice;
 
-    LockThreadQueue<std::wstring> logQueue{};
     UINT64 primeGPURenderingTime = 0;
     UINT64 secondGPURenderingTime = 0;
 
@@ -84,15 +88,15 @@ protected:
     std::vector<D3D12_INPUT_ELEMENT_DESC> defaultInputLayout{};
     GDescriptor srvTexturesMemory;
     RenderModeFactory defaultPrimePipelineResources;
-    
+
     bool IsStop = false;
 
     bool IsUsingSharedSSAO = false;
-    
+
     UINT pathMapShow = 0;
     //off, shadowMap, ssaoMap
     const UINT maxPathMap = 3;
-    
+
 
     std::shared_ptr<UILayer> UIPath;
     std::shared_ptr<ShadowMap> shadowPath;
@@ -131,4 +135,5 @@ protected:
     Vector3 mRotatedLightDirections[3];
 
     DirectX::BoundingSphere mSceneBounds;
+    int blurCount = 3;
 };

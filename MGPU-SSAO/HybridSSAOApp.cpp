@@ -13,6 +13,7 @@
 #include "SkyBox.h"
 #include "Transform.h"
 #include "Window.h"
+#include "Services/Benchmark/States/WaitState.h"
 
 HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance)
 {
@@ -21,6 +22,12 @@ HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance)
 }
 
 HybridSSAOApp::~HybridSSAOApp() = default;
+
+void HybridSSAOApp::SwitchDevice()
+{
+    Flush();
+    IsUsingSharedSSAO = !IsUsingSharedSSAO;
+}
 
 void HybridSSAOApp::Update(const GameTimer& gt)
 {
@@ -76,6 +83,7 @@ void HybridSSAOApp::Update(const GameTimer& gt)
     UpdateShadowPassCB(gt);
     UpdateSsaoCB(gt);
     UIPath->Update();
+    benchmark.Tick(gt.DeltaTime());
 }
 
 void HybridSSAOApp::PopulateShadowMapCommands(const std::shared_ptr<GCommandList>& cmdList)
@@ -162,7 +170,7 @@ void HybridSSAOApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandLis
                 secondCmdList->CopyResource(Resources.GetNormalMap(), CrossResource.GetNormalMap().GetSharedResource());
                 secondCmdList->CopyResource(Resources.GetDepthMap(), CrossResource.GetDepthMap().GetSharedResource());
 
-                ambientPass->ComputeSsao(secondCmdList, currentFrameResource->SecondSsaoConstantUploadBuffer, Resources, 3);
+                ambientPass->ComputeSsao(secondCmdList, currentFrameResource->SecondSsaoConstantUploadBuffer, Resources, blurCount);
 
                 secondCmdList->CopyResource(CrossResource.GetAmbientMap().GetSharedResource(), Resources.GetAmbientMap());
 
@@ -172,7 +180,7 @@ void HybridSSAOApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandLis
     }
     else
     {
-        ambientPass->ComputeSsao(cmdList, currentFrameResource->PrimeSsaoConstantUploadBuffer, ambientPass->GetPrimeResources(), 3);
+        ambientPass->ComputeSsao(cmdList, currentFrameResource->PrimeSsaoConstantUploadBuffer, ambientPass->GetPrimeResources(), blurCount);
     }
 }
 
@@ -332,6 +340,30 @@ bool HybridSSAOApp::Initialize()
 
     Flush();
 
+    logs.PushMessage(L"\nNative Implementation");
+    MainWindow->SetWindowTitle(L"\nNative Implementation");
+    benchmark.AddState<WaitState>(120, [this]()
+                                  {
+                                      logs.PushMessage(L"\nHybrid Implementation");
+                                      MainWindow->SetWindowTitle(L"\nHybrid Implementation");
+                                      SwitchDevice();
+                                  }, [this](const TimeStats& ts, float progress)
+                                  {
+                                      Benchmark::PrintStats(ts, &logs);
+                                      MainWindow->SetWindowTitle(L"Native Implementation Progress " + std::to_wstring(progress) + L"%");
+                                  });
+    benchmark.AddState<WaitState>(120, [this]()
+                                  {
+                                      logs.PushMessage(L"\nDone");
+                                      MainWindow->SetWindowTitle(L"Done");
+                                      IsStop = true;
+                                  }, [this](const TimeStats& ts, float progress)
+                                  {
+                                      Benchmark::PrintStats(ts, &logs);
+                                      MainWindow->SetWindowTitle(L"Hybrid Implementation Progress " + std::to_wstring(progress) + L"%");
+                                  });
+    benchmark.Start();
+
     return true;
 }
 
@@ -358,12 +390,13 @@ void HybridSSAOApp::InitDevices()
         typedRenderer.emplace_back(MemoryAllocator::CreateVector<std::shared_ptr<Renderer>>());
     }
 
-    logQueue.Push(L"\nPrime Device: " + (primeDevice->GetName()));
-    logQueue.Push(
+
+    logs.PushMessage(L"\nPrime Device: " + (primeDevice->GetName()));
+    logs.PushMessage(
         L"\t\n Cross Adapter Texture Support: " + std::to_wstring(
             primeDevice->IsCrossAdapterTextureSupported()));
-    logQueue.Push(L"\nSecond Device: " + (secondDevice->GetName()));
-    logQueue.Push(
+    logs.PushMessage(L"\nSecond Device: " + (secondDevice->GetName()));
+    logs.PushMessage(
         L"\t\n Cross Adapter Texture Support: " + std::to_wstring(
             secondDevice->IsCrossAdapterTextureSupported()));
 }
@@ -374,7 +407,7 @@ void HybridSSAOApp::InitFrameResource()
     {
         frameResources.emplace_back(std::make_unique<FrameResource>(primeDevice, secondDevice, 2, assets->GetMaterials().size()));
     }
-    logQueue.Push(std::wstring(L"\nInit FrameResource "));
+    logs.PushMessage(std::wstring(L"\nInit FrameResource "));
 }
 
 void HybridSSAOApp::InitRootSignature()
@@ -400,7 +433,7 @@ void HybridSSAOApp::InitRootSignature()
 
     primeDeviceSignature = rootSignature;
 
-    logQueue.Push(std::wstring(L"\nInit RootSignature for " + primeDevice->GetName()));
+    logs.PushMessage(std::wstring(L"\nInit RootSignature for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::InitPipeLineResource()
@@ -433,7 +466,7 @@ void HybridSSAOApp::InitPipeLineResource()
                                                  BackBufferFormat, DXGI_FORMAT_D32_FLOAT, nullptr,
                                                  NormalMapFormat, AmbientMapFormat);
 
-    logQueue.Push(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
+    logs.PushMessage(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::CreateMaterials()
@@ -452,7 +485,7 @@ void HybridSSAOApp::CreateMaterials()
 
     models[L"quad"]->SetMeshMaterial(0, assets->GetMaterial(assets->GetMaterialIndex(L"seamless")));
 
-    logQueue.Push(std::wstring(L"\nCreate Materials"));
+    logs.PushMessage(std::wstring(L"\nCreate Materials"));
 }
 
 void HybridSSAOApp::InitSRVMemoryAndMaterials()
@@ -469,8 +502,7 @@ void HybridSSAOApp::InitSRVMemoryAndMaterials()
         material->InitMaterial(&srvTexturesMemory);
     }
 
-    logQueue.Push(std::wstring(L"\nInit Views for " + primeDevice->GetName()));
-
+    logs.PushMessage(std::wstring(L"\nInit Views for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::InitRenderPaths()
@@ -497,13 +529,12 @@ void HybridSSAOApp::InitRenderPaths()
     commandQueue->WaitForFenceValue(commandQueue->ExecuteCommandList(cmdList));
     commandQueue->Flush();
 
-    logQueue.Push(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
+    logs.PushMessage(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
 
     shadowPath = (std::make_shared<ShadowMap>(primeDevice, 2048, 2048));
 
     UIPath = std::make_shared<UILayer>(primeDevice, MainWindow->GetWindowHandle());
 }
-
 
 void HybridSSAOApp::LoadStudyTexture()
 {
@@ -571,7 +602,7 @@ void HybridSSAOApp::LoadStudyTexture()
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
     Flush();
-    logQueue.Push(std::wstring(L"\nLoad DDS Texture"));
+    logs.PushMessage(std::wstring(L"\nLoad DDS Texture"));
 }
 
 void HybridSSAOApp::LoadModels()
@@ -628,7 +659,7 @@ void HybridSSAOApp::LoadModels()
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
     Flush();
-    logQueue.Push(std::wstring(L"\nLoad Models Data"));
+    logs.PushMessage(std::wstring(L"\nLoad Models Data"));
 }
 
 void HybridSSAOApp::MipMasGenerate()
@@ -657,29 +688,29 @@ void HybridSSAOApp::MipMasGenerate()
             auto computeList = computeQueue->GetCommandList();
             GTexture::GenerateMipMaps(computeList, generatedMipTextures.data(), generatedMipTextures.size());
             computeQueue->WaitForFenceValue(computeQueue->ExecuteCommandList(computeList));
-            logQueue.Push(std::wstring(L"\nMip Map Generation for " + primeDevice->GetName()));
+            logs.PushMessage(std::wstring(L"\nMip Map Generation for " + primeDevice->GetName()));
 
             computeList = computeQueue->GetCommandList();
             for (auto&& texture : generatedMipTextures)
                 computeList->TransitionBarrier(texture->GetD3D12Resource(), D3D12_RESOURCE_STATE_COMMON);
             computeList->FlushResourceBarriers();
-            logQueue.Push(std::wstring(L"\nTexture Barrier Generation for " + primeDevice->GetName()));
+            logs.PushMessage(std::wstring(L"\nTexture Barrier Generation for " + primeDevice->GetName()));
             computeQueue->WaitForFenceValue(computeQueue->ExecuteCommandList(computeList));
             computeQueue->Flush();
-            logQueue.Push(std::wstring(L"\nMipMap Generation cmd list executing " + primeDevice->GetName()));
+            logs.PushMessage(std::wstring(L"\nMipMap Generation cmd list executing " + primeDevice->GetName()));
             for (auto&& pair : textures)
                 pair->ClearTrack();
-            logQueue.Push(std::wstring(L"\nFinish Mip Map Generation for " + primeDevice->GetName()));
+            logs.PushMessage(std::wstring(L"\nFinish Mip Map Generation for " + primeDevice->GetName()));
         }
     }
     catch (DxException& e)
     {
-        logQueue.Push(L"\n" + e.Filename + L" " + e.FunctionName + L" " + std::to_wstring(e.LineNumber));
+        logs.PushMessage(L"\n" + e.Filename + L" " + e.FunctionName + L" " + std::to_wstring(e.LineNumber));
         MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
     }
     catch (...)
     {
-        logQueue.Push(L"\nWTF???? How It Fix");
+        logs.PushMessage(L"\nWTF???? How It Fix");
     }
 }
 
@@ -703,7 +734,7 @@ void HybridSSAOApp::SortGO()
 
 void HybridSSAOApp::CreateGO()
 {
-    logQueue.Push(std::wstring(L"\nStart Create GO"));
+    logs.PushMessage(std::wstring(L"\nStart Create GO"));
     auto skySphere = std::make_unique<GameObject>("Sky");
     skySphere->GetTransform()->SetScale({500, 500, 500});
     {
@@ -882,113 +913,15 @@ void HybridSSAOApp::CreateGO()
     typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
-    logQueue.Push(std::wstring(L"\nFinish create GO"));
+    logs.PushMessage(std::wstring(L"\nFinish create GO"));
 }
 
-static constexpr int StatisticStepSecondsCount = 60;
-
-void HybridSSAOApp::CalculateFrameStats()
-{
-    static float minFps = std::numeric_limits<float>::max();
-    static float minMspf = std::numeric_limits<float>::max();
-    static float maxFps = std::numeric_limits<float>::min();
-    static float maxMspf = std::numeric_limits<float>::min();
-    static UINT writeStaticticCount = 0;
-    static UINT64 primeGPUTimeMax = std::numeric_limits<UINT64>::min();
-    static UINT64 primeGPUTimeMin = std::numeric_limits<UINT64>::max();
-    static UINT64 secondGPUTimeMax = std::numeric_limits<UINT64>::min();
-    static UINT64 secondGPUTimeMin = std::numeric_limits<UINT64>::max();
-    frameCount++;
-
-    if ((timer.TotalTime() - timeElapsed) >= 1.0f)
-    {
-        float fps = static_cast<float>(frameCount); // fps = frameCnt / 1
-        float mspf = 1000.0f / fps;
-
-        minFps = std::min(fps, minFps);
-        minMspf = std::min(mspf, minMspf);
-        maxFps = std::max(fps, maxFps);
-        maxMspf = std::max(mspf, maxMspf);
-
-        primeGPUTimeMin = std::min(primeGPURenderingTime, primeGPUTimeMin);
-        primeGPUTimeMax = std::max(primeGPURenderingTime, primeGPUTimeMax);
-        secondGPUTimeMin = std::min(secondGPURenderingTime, secondGPUTimeMin);
-        secondGPUTimeMax = std::max(secondGPURenderingTime, secondGPUTimeMax);
-
-
-        if (writeStaticticCount >= StatisticStepSecondsCount)
-        {
-            const std::wstring staticticStr =
-                L"\nUse Shared SSAO: " + std::to_wstring(IsUsingSharedSSAO)
-                + L"\n\tMin FPS:" + std::to_wstring(minFps)
-                + L"\n\tMin MSPF:" + std::to_wstring(minMspf)
-                + L"\n\tMax FPS:" + std::to_wstring(maxFps)
-                + L"\n\tMax MSPF:" + std::to_wstring(maxMspf)
-                + L"\n\tMax Prime GPU Rendering Time:" + std::to_wstring(primeGPUTimeMax) +
-                +L"\n\tMin Prime GPU Rendering Time:" + std::to_wstring(primeGPUTimeMin) +
-                +L"\n\tMax Second GPU Rendering Time:" + std::to_wstring(secondGPUTimeMax)
-                + L"\n\tMin Second GPU Rendering Time:" + std::to_wstring(secondGPUTimeMin);
-
-            logQueue.Push(staticticStr);
-
-            writeStaticticCount = 0;
-            minFps = std::numeric_limits<float>::max();
-            minMspf = std::numeric_limits<float>::max();
-            maxFps = std::numeric_limits<float>::min();
-            maxMspf = std::numeric_limits<float>::min();
-            primeGPUTimeMax = std::numeric_limits<UINT64>::min();
-            primeGPUTimeMin = std::numeric_limits<UINT64>::max();
-            secondGPUTimeMax = std::numeric_limits<UINT64>::min();
-            secondGPUTimeMin = std::numeric_limits<UINT64>::max();
-        }
-        else
-        {
-            const std::wstring staticticStr =
-                L"\n\tFPS:" + std::to_wstring(fps)
-                + L"\n\tMSPF:" + std::to_wstring(mspf)
-                + L"\n\tPrime GPU Rendering Time:" + std::to_wstring(primeGPURenderingTime)
-                + L"\n\tSecond GPU Rendering Time:" + std::to_wstring(secondGPURenderingTime);
-
-            logQueue.Push(staticticStr);
-
-            writeStaticticCount++;
-        }
-        frameCount = 0;
-        timeElapsed += 1.0f;
-    }
-}
-
-void HybridSSAOApp::LogWriting()
+void HybridSSAOApp::OnApplicationExit()
 {
     const std::filesystem::path filePath(
-        L"SharedUI " + primeDevice->GetName() + L"+" + secondDevice->GetName() + L".txt");
-
+        L"HybridAO " + primeDevice->GetName() + L"+" + secondDevice->GetName() + L".log");
     const auto path = std::filesystem::current_path().wstring() + L"\\" + filePath.wstring();
-
-    OutputDebugStringW(path.c_str());
-
-    std::wofstream fileSteam;
-    fileSteam.open(path.c_str(), std::ios::out | std::ios::in | std::ios::binary | std::ios::trunc);
-    if (fileSteam.is_open())
-    {
-        fileSteam << L"Information" << std::endl << L"Statistic step seconds:" << std::to_wstring(
-            StatisticStepSecondsCount) << std::endl;
-    }
-
-    std::wstring line;
-
-    while (logQueue.Size() > 0)
-    {
-        while (logQueue.TryPop(line))
-        {
-            fileSteam << line;
-        }
-    }
-
-    fileSteam << L"\nFinish Logs" << std::endl;
-
-    fileSteam.flush();
-    fileSteam.close();
+    logs.WriteAllLog(path);
 }
 
 int HybridSSAOApp::Run()
@@ -1011,22 +944,16 @@ int HybridSSAOApp::Run()
             if (IsStop)
             {
                 MainWindow->SetWindowTitle(MainWindow->GetWindowName() + L" Finished. Wait...");
-                LogWriting();
+                OnApplicationExit();
                 Quit();
                 break;
             }
 
             timer.Tick();
 
-            //if (!isAppPaused)
             {
-                CalculateFrameStats();
                 Update(timer);
                 Draw(timer);
-            }
-            //else
-            {
-                //Sleep(100);
             }
 
             primeDevice->ResetAllocators(frameCount);
@@ -1226,7 +1153,7 @@ bool HybridSSAOApp::InitMainWindow()
 {
     MainWindow = CreateRenderWindow(primeDevice, mainWindowCaption, 1920, 1080, false);
 
-    logQueue.Push(std::wstring(L"\nInit Window"));
+    logs.PushMessage(std::wstring(L"\nInit Window"));
     return true;
 }
 
