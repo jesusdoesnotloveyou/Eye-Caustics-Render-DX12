@@ -434,8 +434,6 @@ void HybridSSAOApp::InitPipeLineResource()
                                                  NormalMapFormat, AmbientMapFormat);
 
     logQueue.Push(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
-
-    const auto primeDeviceShadowMapPso = defaultPrimePipelineResources.GetPSO(RenderMode::ShadowMapOpaque);
 }
 
 void HybridSSAOApp::CreateMaterials()
