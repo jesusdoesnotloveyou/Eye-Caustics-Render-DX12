@@ -48,7 +48,7 @@ void HybridSSAOApp::Update(const GameTimer& gt)
     if (currentFrameResource->SecondRenderFenceValue != 0 && !secondQueue->IsFinish(
         currentFrameResource->SecondRenderFenceValue))
     {
-        secondQueue->WaitForFenceValue(currentFrameResource->PrimeRenderFenceValue);
+        secondQueue->WaitForFenceValue(currentFrameResource->SecondRenderFenceValue);
     }
     else
     {
@@ -1311,7 +1311,7 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
             }
 
 
-            if (keycode == (VK_SPACE) && keyboard.KeyIsPressed(VK_SPACE))
+            if (keycode == (VK_F1) && keyboard.KeyIsPressed(VK_F1))
             {
                 IsUsingSharedSSAO = !IsUsingSharedSSAO;
                 Flush();
@@ -1320,12 +1320,6 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
             if (keycode == (VK_F2) && keyboard.KeyIsPressed(VK_F2))
             {
                 pathMapShow = (pathMapShow + 1) % maxPathMap;
-            }
-
-            if (keycode == VK_ESCAPE && keyboard.KeyIsPressed(VK_ESCAPE))
-            {
-                Flush();
-                IsStop = true;
             }
 
             return 0;
