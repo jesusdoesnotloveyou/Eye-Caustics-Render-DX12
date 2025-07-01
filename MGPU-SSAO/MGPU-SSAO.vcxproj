@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2c7aa41e-e73e-4d29-bdbe-1d1209a6f6b2}</ProjectGuid>
-    <RootNamespace>SSAOMultiGPU</RootNamespace>
+    <ProjectGuid>{2C7AA41E-E73E-4D29-BDBE-1D1209A6F6B2}</ProjectGuid>
+    <RootNamespace>MGPU-SSAO</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -88,7 +88,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Submodule\imgui;$(SolutionDir)Submodule\imgui\backends;$(SolutionDir)\Common;$(SolutionDir)\Utils;$(SolutionDir)Assimp\include;$(SolutionDir)\Graphics;$(SolutionDir)\Allocator;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -105,7 +105,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Submodule\imgui;$(SolutionDir)Submodule\imgui\backends;$(SolutionDir)\Common;$(SolutionDir)\Utils;$(SolutionDir)Assimp\include;$(SolutionDir)\Graphics;$(SolutionDir)\Allocator;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -122,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Submodule\imgui;$(SolutionDir)Submodule\imgui\backends;$(SolutionDir)\Common;$(SolutionDir)\Utils;$(SolutionDir)\Graphics;$(SolutionDir)\Allocator;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -139,7 +139,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Submodule\imgui;$(SolutionDir)Submodule\imgui\backends;$(SolutionDir)\Common;$(SolutionDir)\Utils;$(SolutionDir)Assimp\include;$(SolutionDir)\Graphics;$(SolutionDir)\Allocator;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -160,8 +160,8 @@
     <ClCompile Include="..\Submodule\imgui\imgui_widgets.cpp" />
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="HybridSSAOApp.cpp" />
-    <ClCompile Include="Source.cpp" />
     <ClCompile Include="SharedSSAO.cpp" />
+    <ClCompile Include="Source.cpp" />
     <ClCompile Include="UILayer.cpp" />
   </ItemGroup>
   <ItemGroup>

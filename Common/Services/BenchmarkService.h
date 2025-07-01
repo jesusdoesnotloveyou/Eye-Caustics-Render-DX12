@@ -13,7 +13,9 @@ class BenchmarkService final
     std::vector<std::shared_ptr<BenchmarkState>> states;
     int currentStateIndex = -1;
 
-    const std::shared_ptr<BenchmarkState>& GetCurrentState() const;
+    BenchmarkState* CurrentState;
+
+    void SetState(BenchmarkState* state);
 
 public:
     void Start();

@@ -170,7 +170,7 @@ void HybridSSAOApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandLis
                 secondCmdList->CopyResource(Resources.GetNormalMap(), CrossResource.GetNormalMap().GetSharedResource());
                 secondCmdList->CopyResource(Resources.GetDepthMap(), CrossResource.GetDepthMap().GetSharedResource());
 
-                ambientPass->ComputeSsao(secondCmdList, currentFrameResource->SecondSsaoConstantUploadBuffer, Resources, blurCount);
+                ambientPass->ComputeSsao(secondCmdList, currentFrameResource->SecondSsaoConstantUploadBuffer, Resources, 1);
 
                 secondCmdList->CopyResource(CrossResource.GetAmbientMap().GetSharedResource(), Resources.GetAmbientMap());
 
@@ -180,7 +180,7 @@ void HybridSSAOApp::PopulateAmbientMapCommands(const std::shared_ptr<GCommandLis
     }
     else
     {
-        ambientPass->ComputeSsao(cmdList, currentFrameResource->PrimeSsaoConstantUploadBuffer, ambientPass->GetPrimeResources(), blurCount);
+        ambientPass->ComputeSsao(cmdList, currentFrameResource->PrimeSsaoConstantUploadBuffer, ambientPass->GetPrimeResources(), 3);
     }
 }
 
@@ -360,7 +360,7 @@ bool HybridSSAOApp::Initialize()
                                   }, [this](const TimeStats& ts, float progress)
                                   {
                                       Benchmark::PrintStats(ts, &logs);
-                                      MainWindow->SetWindowTitle(L"Hybrid Implementation Progress " + std::to_wstring(progress) + L"%");
+                                      MainWindow->SetWindowTitle(L"Hybrid Implementation Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
                                   });
     benchmark.Start();
 
@@ -522,18 +522,18 @@ void HybridSSAOApp::InitRenderPaths()
         MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
     ambientPass->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
 
-    antiAliasingPrimePath = (std::make_shared<SSAA>(primeDevice, 2, MainWindow->GetClientWidth(),
+    antiAliasingPrimePath = (std::make_shared<SSAA>(primeDevice, 8, MainWindow->GetClientWidth(),
                                                     MainWindow->GetClientHeight(), DXGI_FORMAT_D32_FLOAT));
     antiAliasingPrimePath->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
 
+    shadowPath = (std::make_shared<ShadowMap>(primeDevice, 4096, 4096));
+
+    UIPath = std::make_shared<UILayer>(primeDevice, MainWindow->GetWindowHandle());
+    
     commandQueue->WaitForFenceValue(commandQueue->ExecuteCommandList(cmdList));
     commandQueue->Flush();
 
-    logs.PushMessage(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
-
-    shadowPath = (std::make_shared<ShadowMap>(primeDevice, 2048, 2048));
-
-    UIPath = std::make_shared<UILayer>(primeDevice, MainWindow->GetWindowHandle());
+    logs.PushMessage(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));   
 }
 
 void HybridSSAOApp::LoadStudyTexture()
@@ -1235,7 +1235,7 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
                 }
             }
 
-
+#if defined(DEBUG) || defined(_DEBUG)
             if (keycode == (VK_F1) && keyboard.KeyIsPressed(VK_F1))
             {
                 IsUsingSharedSSAO = !IsUsingSharedSSAO;
@@ -1246,6 +1246,7 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
             {
                 pathMapShow = (pathMapShow + 1) % maxPathMap;
             }
+#endif
 
             return 0;
         }

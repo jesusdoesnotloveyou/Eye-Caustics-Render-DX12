@@ -2,27 +2,40 @@
 #include "BenchmarkService.h"
 #include "LogService.h"
 
-const std::shared_ptr<BenchmarkState>& BenchmarkService::GetCurrentState() const
+
+void BenchmarkService::SetState(BenchmarkState* state)
 {
-    return states[currentStateIndex];
+    if (CurrentState != nullptr)
+    {
+        CurrentState->Exit();
+    }
+    CurrentState = state;
+    if (CurrentState != nullptr)
+    {
+        CurrentState->Enter();
+    }
 }
 
 void BenchmarkService::Start()
 {
     currentStateIndex = 0;
-    GetCurrentState()->Enter();
+    if (!states.empty())
+    {
+        CurrentState = states[currentStateIndex].get();
+    }
 }
 
 
 void BenchmarkService::Tick(float deltaTime)
 {
     if (currentStateIndex < 0 || currentStateIndex >= states.size()) return;
-    if (const auto& State = GetCurrentState())
+    if (CurrentState)
     {
-        State->Tick(deltaTime);
-        if (State->IsCompleted())
+        CurrentState->Tick(deltaTime);
+        if (CurrentState->IsCompleted())
         {
-            ++currentStateIndex;
+            currentStateIndex = (currentStateIndex + 1) % states.size();
+            SetState(states[currentStateIndex].get());
         }
     }
 }

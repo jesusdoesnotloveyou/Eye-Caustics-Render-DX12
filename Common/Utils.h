@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <format>
+
 #include "Services/LogService.h"
 #include "Services/States/BenchmarkState.h"
 
@@ -8,10 +10,14 @@ namespace Benchmark
 {
     static void PrintStats(const TimeStats& stats, LogService* logs)
     {
-        const std::wstring staticticStr = L"\nTimeStats\n\tMin FPS:" + std::to_wstring(stats.minFps)
-            + L"\n\tMin MSPF:" + std::to_wstring(stats.minMspf)
-            + L"\n\tMax FPS:" + std::to_wstring(stats.maxFps)
-            + L"\n\tMax MSPF:" + std::to_wstring(stats.maxMspf);
+        const std::wstring staticticStr = std::format(L"\nTimeStats"
+                                                      "\n\tFPS:{:.2f}"
+                                                      "\n\tMSPF:{:.2f}"
+                                                      "\n\tMin FPS:{:.2f}"
+                                                      "\n\tMin MSPF:{:.2f}"
+                                                      "\n\tMax FPS:{:.2f}"
+                                                      "\n\tMax MSPF:{:.2f}",
+            stats.fps, stats.mspf, stats.minFps, stats.minMspf, stats.maxFps, stats.maxMspf);
         logs->PushMessage(staticticStr);
     }
 }

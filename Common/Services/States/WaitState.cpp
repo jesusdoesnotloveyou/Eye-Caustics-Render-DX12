@@ -4,10 +4,10 @@
 void WaitState::OnStatsCalculated(const TimeStats& stats)
 {
     currentStatsCalculation++;
-    OnStatChanged(stats, currentStatsCalculation/waitTime);
+    OnStatChanged(stats, (float) currentStatsCalculation/waitTime);
 }
 
 bool WaitState::IsCompleted()
 {
-    return currentStatsCalculation <= waitTime;
+    return currentStatsCalculation >= waitTime;
 }

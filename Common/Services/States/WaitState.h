@@ -26,7 +26,7 @@ private:
     }
 
     std::function<void()> OnCompleted;
-    std::function<void(const TimeStats&, double)> OnStatChanged;
+    std::function<void(const TimeStats&, float)> OnStatChanged;
 
     bool IsCompleted() override;
     uint32_t waitTime;
