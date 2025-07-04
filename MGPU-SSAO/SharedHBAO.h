@@ -58,7 +58,7 @@ class SharedHBAO
     UINT RenderTargetHeight;
 
 public:
-    const HBAOResources& GetPrimaryResources() const { return primeResources; }
+    const HBAOResources& GetPrimeResources() const { return primeResources; }
     const HBAOResources& GetSecondResources() const { return secondResources; }
     const SSAOCrossResources& GetCrossResources() const { return crossResources; }
 

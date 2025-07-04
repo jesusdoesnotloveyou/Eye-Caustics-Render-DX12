@@ -29,6 +29,7 @@ public:
     USHORT GetBlurCount() const { return blurCount; }
     void SetBlurPassCount(const USHORT blurCount) { this->blurCount = blurCount; }
     void SwitchDevice();
+    void ChangeAOMethod();
 
 protected:
     void Update(const GameTimer& gt) override;
