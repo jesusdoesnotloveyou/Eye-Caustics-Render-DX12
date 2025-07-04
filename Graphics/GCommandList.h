@@ -73,20 +73,31 @@ namespace PEPEngine::Graphics
         ComPtr<ID3D12GraphicsCommandList2> GetGraphicsCommandList() const;
 
         void UpdateDescriptorHeaps() const;
-
+        void SetComputeRootShaderResourceView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
+        void SetGraphicsRootShaderResourceView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
         void SetDescriptorsHeap(const GDescriptor* memory);
 
 
         void SetRootShaderResourceView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
+        void SetComputeRootConstantBufferView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
+        void SetGraphicsRootConstantBufferView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
 
         void SetRootConstantBufferView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
+        void SetComputeRootUnorderedAccessView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
 
+        void SetGraphicsRootUnorderedAccessView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
         void SetRootUnorderedAccessView(UINT rootSignatureSlot, const GBuffer& resource, UINT offset = 0);
+        void SetComputeRoot32BitConstants(UINT rootSignatureSlot, UINT Count32BitValueToSet, const void* data, UINT DestOffsetIn32BitValueToSet) const;
+        void SetGraphicsRoot32BitConstants(UINT rootSignatureSlot, UINT Count32BitValueToSet, const void* data, UINT DestOffsetIn32BitValueToSet) const;
 
         void SetRoot32BitConstants(UINT rootSignatureSlot, UINT Count32BitValueToSet, const void* data,
                                    UINT DestOffsetIn32BitValueToSet) const;
+        void SetComputeRoot32BitConstant(UINT shaderRegister, UINT value, UINT offset = 0) const;
+        void SetGraphicsRoot32BitConstant(UINT shaderRegister, UINT value, UINT offset = 0) const;
 
         void SetRoot32BitConstant(UINT shaderRegister, UINT value, UINT offset) const;
+        void SetComputeRootDescriptorTable(UINT rootSignatureSlot, const GDescriptor* memory, UINT offset = 0) const;
+        void SetGraphicsRootDescriptorTable(UINT rootSignatureSlot, const GDescriptor* memory, UINT offset = 0) const;
 
         void SetRootDescriptorTable(UINT rootSignatureSlot, const GDescriptor* memory, UINT offset = 0) const;
 
@@ -94,10 +105,14 @@ namespace PEPEngine::Graphics
                                size_t countSubresources);
         void UpdateSubresource(const ComPtr<ID3D12Resource>& destResource, const D3D12_SUBRESOURCE_DATA* subresources,
                                size_t countSubresources);
+        void StartMark(const std::wstring& message) const;
+        void EndMark() const;
 
         void SetViewports(const D3D12_VIEWPORT* viewports, size_t count) const;
 
         void SetScissorRects(const D3D12_RECT* scissorRects, size_t count) const;
+        void SetComputeRootSignature(const GRootSignature& rs);
+        void SetGraphicsRootSignature(const GRootSignature& rs);
 
         void SetRootSignature(const GRootSignature& rs);
         

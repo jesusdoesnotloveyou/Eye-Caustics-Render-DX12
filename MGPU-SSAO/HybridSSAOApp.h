@@ -10,6 +10,7 @@
 #include "GCrossAdapterResource.h"
 #include "GDeviceFactory.h"
 #include "Light.h"
+#include "SharedHBAO.h"
 #include "UILayer.h"
 #include "Services/LogService.h"
 #include "Services/BenchmarkService.h"
@@ -92,6 +93,7 @@ protected:
     bool IsStop = false;
 
     bool IsUsingSharedSSAO = false;
+    bool IsUseHBAO = false;
 
     UINT pathMapShow = 0;
     //off, shadowMap, ssaoMap
@@ -100,7 +102,8 @@ protected:
 
     std::shared_ptr<UILayer> UIPath;
     std::shared_ptr<ShadowMap> shadowPath;
-    std::shared_ptr<SharedSSAO> ambientPass;
+    std::shared_ptr<SharedSSAO> ssaoPass;
+    std::shared_ptr<SharedHBAO> hbaoPass;
     std::shared_ptr<SSAA> antiAliasingPrimePath;
 
     custom_vector<std::shared_ptr<GameObject>> gameObjects = MemoryAllocator::CreateVector<std::shared_ptr<

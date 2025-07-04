@@ -14,18 +14,9 @@
 
 using namespace Microsoft::WRL;
 
-void SSAOResources::Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout)
+void SSAOResources::InitializeRS()
 {
-    this->device = Device;
-    normalMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    normalMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
-    depthMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    depthMapDSV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
-    randomVectorMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-    ambientMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
-    ambientMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2);
-
-    ssaoRootSignature = std::make_shared<GRootSignature>();
+    aoRootSignature = std::make_shared<GRootSignature>();
 
     CD3DX12_DESCRIPTOR_RANGE texTable0;
     texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
@@ -33,10 +24,10 @@ void SSAOResources::Initialize(const std::shared_ptr<GDevice>& Device, const D3D
     CD3DX12_DESCRIPTOR_RANGE texTable1;
     texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
 
-    ssaoRootSignature->AddConstantBufferParameter(0);
-    ssaoRootSignature->AddConstantParameter(1, 1);
-    ssaoRootSignature->AddDescriptorParameter(&texTable0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-    ssaoRootSignature->AddDescriptorParameter(&texTable1, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    aoRootSignature->AddConstantBufferParameter(0);
+    aoRootSignature->AddConstantParameter(1, 1);
+    aoRootSignature->AddDescriptorParameter(&texTable0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    aoRootSignature->AddDescriptorParameter(&texTable1, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
         0, // shaderRegister
@@ -77,9 +68,23 @@ void SSAOResources::Initialize(const std::shared_ptr<GDevice>& Device, const D3D
 
     for (auto&& sampler : staticSamplers)
     {
-        ssaoRootSignature->AddStaticSampler(sampler);
+        aoRootSignature->AddStaticSampler(sampler);
     }
-    ssaoRootSignature->Initialize(device);
+    aoRootSignature->Initialize(device);
+}
+
+void SSAOResources::Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout)
+{
+    this->device = Device;
+    normalMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    normalMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
+    depthMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    depthMapDSV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+    randomVectorMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    ambientMapSRV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2);
+    ambientMapRTV = Device->AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2);
+
+    InitializeRS();
 
     BuildOffsetVectors();
     BuildPSO(layout);
@@ -132,7 +137,7 @@ void SSAOResources::OnResize(uint32_t width, uint32_t height)
 
     if (ambientMap0.GetD3D12Resource() == nullptr)
     {
-        texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         texDesc.Format = AmbientMapFormat;
 
         float ambientClearColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -160,6 +165,8 @@ void SSAOResources::RebuildDescriptors() const
     dsvDesc.Texture2D.MipSlice = 0;
     depthMap.CreateDepthStencilView(&dsvDesc, &depthMapDSV);
 
+    
+    
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -198,7 +205,7 @@ void SSAOResources::BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout)
 
     ZeroMemory(&basePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
     basePsoDesc.InputLayout = layout;
-    basePsoDesc.pRootSignature = ssaoRootSignature->GetNativeSignature().Get();
+    basePsoDesc.pRootSignature = aoRootSignature->GetNativeSignature().Get();
     basePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     basePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     basePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -212,7 +219,7 @@ void SSAOResources::BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout)
 
     ssaoPSO = std::make_shared<GraphicPSO>(RenderMode::Ssao);
     ssaoPSO->SetPsoDesc(basePsoDesc);
-    ssaoPSO->SetRootSignature(*ssaoRootSignature.get());
+    ssaoPSO->SetRootSignature(*aoRootSignature.get());
     ssaoPSO->SetInputLayout({nullptr, 0});
     ssaoPSO->SetShader(RenderModeFactory::GetShader("ssaoVS").get());
     ssaoPSO->SetShader(RenderModeFactory::GetShader("ssaoPS").get());
@@ -305,6 +312,7 @@ void SSAOResources::BuildRandomTexture()
         {
             // Random vector in [0,1].  We will decompress in shader to [-1,1].
             Vector3 v(MathHelper::RandF(), MathHelper::RandF(), MathHelper::RandF());
+            v.Normalize();
             data[i * 256 + j] = Vector4(v.x, v.y, v.z, 0.0f);
         }
     }
@@ -408,24 +416,23 @@ void SharedSSAO::Initialize(const std::shared_ptr<GDevice>& primeDevice, const s
 
 void SharedSSAO::OnResize(const UINT newWidth, const UINT newHeight)
 {
-    if (RenderTargetWidth != newWidth || RenderTargetHeight != newHeight)
-    {
-        RenderTargetWidth = newWidth;
-        RenderTargetHeight = newHeight;
+    if (RenderTargetWidth == newWidth && RenderTargetHeight == newHeight)
+        return;
+    RenderTargetWidth = newWidth;
+    RenderTargetHeight = newHeight;
 
-        mViewport.TopLeftX = 0.0f;
-        mViewport.TopLeftY = 0.0f;
-        mViewport.Width = RenderTargetWidth;
-        mViewport.Height = RenderTargetHeight;
-        mViewport.MinDepth = 0.0f;
-        mViewport.MaxDepth = 1.0f;
+    mViewport.TopLeftX = 0.0f;
+    mViewport.TopLeftY = 0.0f;
+    mViewport.Width = RenderTargetWidth;
+    mViewport.Height = RenderTargetHeight;
+    mViewport.MinDepth = 0.0f;
+    mViewport.MaxDepth = 1.0f;
 
-        mScissorRect = {0, 0, static_cast<int>(RenderTargetWidth), static_cast<int>(RenderTargetHeight)};
+    mScissorRect = {0, 0, static_cast<int>(RenderTargetWidth), static_cast<int>(RenderTargetHeight)};
 
-        primeResources.OnResize(newWidth, newHeight);
-        secondResources.OnResize(newWidth, newHeight);
-        crossResources.OnResize(newWidth, newHeight);
-    }
+    primeResources.OnResize(newWidth, newHeight);
+    secondResources.OnResize(newWidth, newHeight);
+    crossResources.OnResize(newWidth, newHeight);
 }
 
 void SharedSSAO::ComputeSsao(
@@ -434,6 +441,7 @@ void SharedSSAO::ComputeSsao(
     const SSAOResources& Resources,
     const int blurCount)
 {
+    cmdList->StartMark(L"SSAO");
     cmdList->SetViewports(&mViewport, 1);
     cmdList->SetScissorRects(&mScissorRect, 1);
 
@@ -469,6 +477,7 @@ void SharedSSAO::ComputeSsao(
     cmdList->FlushResourceBarriers();
 
     BlurAmbientMap(cmdList, Resources, currFrame, blurCount);
+    cmdList->EndMark();
 }
 
 void SharedSSAO::ClearAmbientMap(const std::shared_ptr<GCommandList>& cmdList, const SSAOResources& Resources)

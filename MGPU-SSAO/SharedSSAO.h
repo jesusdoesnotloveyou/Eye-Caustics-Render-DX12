@@ -22,14 +22,16 @@ class SharedSSAO;
 
 static constexpr int MaxBlurRadius = 5;
 
-class SSAOResources final
+class SSAOResources
 {
+protected:
     static constexpr DXGI_FORMAT AmbientMapFormat = DXGI_FORMAT_R16_UNORM;
     static constexpr DXGI_FORMAT NormalMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     static constexpr DXGI_FORMAT DepthMapFormat = DXGI_FORMAT_R32_TYPELESS;
 
+
     std::shared_ptr<GDevice> device;
-    std::shared_ptr<GRootSignature> ssaoRootSignature;
+    std::shared_ptr<GRootSignature> aoRootSignature;
 
     std::shared_ptr<GraphicPSO> ssaoPSO;
     std::shared_ptr<GraphicPSO> blurPSO;
@@ -52,6 +54,7 @@ class SSAOResources final
     Vector4 offsetsVectors[14];
 
 public:
+    virtual ~SSAOResources() = default;
     const GTexture& GetRandomVectorMap() const { return randomVectorMap; }
     const GTexture& GetNormalMap() const { return normalMap; }
     const GTexture& GetAmbientMap() const { return ambientMap0; }
@@ -66,27 +69,28 @@ public:
     const GDescriptor* GetDepthMapDSV() const { return &depthMapDSV; }
     const GDescriptor* GetRandomVectorSRV() const { return &randomVectorMapSRV; }
 
-    const GRootSignature& GetRootSignature() const  { return *ssaoRootSignature;}
+    const GRootSignature& GetRootSignature() const  { return *aoRootSignature;}
     const GraphicPSO& GetSSAOPSO() const { return *ssaoPSO;}
     const GraphicPSO& GetBlurPSO() const { return *blurPSO;}
-    
-    void Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout);
 
-    void OnResize(uint32_t width, uint32_t height);
+    void virtual InitializeRS();
+    void virtual Initialize(const std::shared_ptr<GDevice>& Device, const D3D12_INPUT_LAYOUT_DESC& layout);
+
+    void virtual OnResize(uint32_t width, uint32_t height);
 
     void GetOffsetVectors(Vector4 offsets[14]) const
     {
         std::copy(&offsetsVectors[0], &offsetsVectors[14], &offsets[0]);
     }
 
-private:
-    void RebuildDescriptors() const;
+protected:
+    void virtual RebuildDescriptors() const;
 
-    void BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout);
+    void virtual BuildPSO(const D3D12_INPUT_LAYOUT_DESC& layout);
 
-    void BuildOffsetVectors();
+    void virtual BuildOffsetVectors();
 
-    void BuildRandomTexture();
+    void virtual BuildRandomTexture();
 };
 
 class SSAOCrossResources final

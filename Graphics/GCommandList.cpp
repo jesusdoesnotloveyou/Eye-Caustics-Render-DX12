@@ -1,4 +1,7 @@
 #include "GCommandList.h"
+
+#include <pix3.h>
+
 #include "ComputePSO.h"
 #include "GDataUploader.h"
 #include "GResource.h"
@@ -120,6 +123,31 @@ namespace PEPEngine::Graphics
         cmdList->SetDescriptorHeaps(numDescriptorHeaps, descriptorHeaps);
     }
 
+    void GCommandList::SetComputeRootShaderResourceView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                 const UINT offset)
+    {
+        assert(resource.IsValid() && "Resource is invalid");
+
+        const auto res = resource.GetElementResourceAddress(offset);
+
+        cmdList->SetComputeRootShaderResourceView(rootSignatureSlot, res);
+
+        TrackResource(resource);
+    }
+
+    void GCommandList::SetGraphicsRootShaderResourceView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                 const UINT offset)
+    {
+        assert(resource.IsValid() && "Resource is invalid");
+        assert(type == D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+        const auto res = resource.GetElementResourceAddress(offset);
+        
+        cmdList->SetGraphicsRootShaderResourceView(rootSignatureSlot, res);
+
+        TrackResource(resource);
+    }
+    
     void GCommandList::SetRootShaderResourceView(const UINT rootSignatureSlot, const GBuffer& resource,
                                                  const UINT offset)
     {
@@ -141,6 +169,37 @@ namespace PEPEngine::Graphics
         TrackResource(resource);
     }
 
+    void GCommandList::SetComputeRootConstantBufferView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                 const UINT offset)
+    {
+        if (cachedRootSignature == nullptr)
+            assert("Root Signature not set into the CommandList");
+
+        if (!resource.IsValid())
+            assert("Resource is invalid");
+
+        const auto res = resource.GetElementResourceAddress(offset);
+
+        cmdList->SetComputeRootConstantBufferView(rootSignatureSlot, res);
+        
+        TrackResource(resource);
+    }
+
+    void GCommandList::SetGraphicsRootConstantBufferView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                 const UINT offset)
+    {
+        if (cachedRootSignature == nullptr)
+            assert("Root Signature not set into the CommandList");
+
+        if (!resource.IsValid())
+            assert("Resource is invalid");
+
+        const auto res = resource.GetElementResourceAddress(offset);
+
+        cmdList->SetGraphicsRootConstantBufferView(rootSignatureSlot, res);
+        
+        TrackResource(resource);
+    }
 
     void GCommandList::SetRootConstantBufferView(const UINT rootSignatureSlot, const GBuffer& resource,
                                                  const UINT offset)
@@ -165,6 +224,37 @@ namespace PEPEngine::Graphics
         TrackResource(resource);
     }
 
+    void GCommandList::SetComputeRootUnorderedAccessView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                  const UINT offset)
+    {
+        if (cachedRootSignature == nullptr)
+            assert("Root Signature not set into the CommandList");
+
+        if (!resource.IsValid())
+            assert("Resource is invalid");
+
+        const auto res = resource.GetElementResourceAddress(offset);
+
+        cmdList->SetComputeRootUnorderedAccessView(rootSignatureSlot, res);
+
+        TrackResource(resource);
+    }
+
+    void GCommandList::SetGraphicsRootUnorderedAccessView(const UINT rootSignatureSlot, const GBuffer& resource,
+                                                  const UINT offset)
+    {
+        if (cachedRootSignature == nullptr)
+            assert("Root Signature not set into the CommandList");
+
+        if (!resource.IsValid())
+            assert("Resource is invalid");
+
+        const auto res = resource.GetElementResourceAddress(offset);
+
+        cmdList->SetGraphicsRootUnorderedAccessView(rootSignatureSlot, res);
+
+        TrackResource(resource);
+    }
 
     void GCommandList::SetRootUnorderedAccessView(const UINT rootSignatureSlot, const GBuffer& resource,
                                                   const UINT offset)
@@ -189,6 +279,21 @@ namespace PEPEngine::Graphics
         TrackResource(resource);
     }
 
+    void GCommandList::SetComputeRoot32BitConstants(const UINT rootSignatureSlot, const UINT Count32BitValueToSet,
+                                             const void* data,
+                                             const UINT DestOffsetIn32BitValueToSet) const
+    {
+        cmdList->SetComputeRoot32BitConstants(rootSignatureSlot, Count32BitValueToSet, data,
+                                                  DestOffsetIn32BitValueToSet);
+    }
+
+    void GCommandList::SetGraphicsRoot32BitConstants(const UINT rootSignatureSlot, const UINT Count32BitValueToSet,
+                                             const void* data,
+                                             const UINT DestOffsetIn32BitValueToSet) const
+    {
+        cmdList->SetGraphicsRoot32BitConstants(rootSignatureSlot, Count32BitValueToSet, data,
+                                                  DestOffsetIn32BitValueToSet);
+    }
 
     void GCommandList::SetRoot32BitConstants(const UINT rootSignatureSlot, const UINT Count32BitValueToSet,
                                              const void* data,
@@ -206,6 +311,16 @@ namespace PEPEngine::Graphics
         }
     }
 
+    void GCommandList::SetComputeRoot32BitConstant(const UINT shaderRegister, const UINT value, const UINT offset) const
+    {
+        cmdList->SetComputeRoot32BitConstant(shaderRegister, value, offset);
+    }
+
+    void GCommandList::SetGraphicsRoot32BitConstant(const UINT shaderRegister, const UINT value, const UINT offset) const
+    {
+        cmdList->SetGraphicsRoot32BitConstant(shaderRegister, value, offset);
+    }
+
     void GCommandList::SetRoot32BitConstant(const UINT shaderRegister, const UINT value, const UINT offset) const
     {
         if (type == D3D12_COMMAND_LIST_TYPE_COMPUTE)
@@ -218,6 +333,28 @@ namespace PEPEngine::Graphics
         }
     }
 
+    void GCommandList::SetComputeRootDescriptorTable(const UINT rootSignatureSlot, const GDescriptor* memory,
+                                              const UINT offset) const
+    {
+        if (memory == nullptr || memory->IsNull())
+        {
+            assert("Memory null");
+        }
+
+        cmdList->SetComputeRootDescriptorTable(rootSignatureSlot, memory->GetGPUHandle(offset));
+        
+    }
+
+    void GCommandList::SetGraphicsRootDescriptorTable(const UINT rootSignatureSlot, const GDescriptor* memory,
+                                              const UINT offset) const
+    {
+        if (memory == nullptr || memory->IsNull())
+        {
+            assert("Memory null");
+        }
+
+        cmdList->SetGraphicsRootDescriptorTable(rootSignatureSlot, memory->GetGPUHandle(offset));
+    }
 
     void GCommandList::SetRootDescriptorTable(const UINT rootSignatureSlot, const GDescriptor* memory,
                                               const UINT offset) const
@@ -274,6 +411,15 @@ namespace PEPEngine::Graphics
         TrackResource(res.Get());
     }
 
+    void GCommandList::StartMark(const std::wstring& message) const
+    {
+        PIXBeginEvent(cmdList.Get(), 0, message.c_str());
+    }
+
+    void GCommandList::EndMark() const
+    {
+        PIXEndEvent(cmdList.Get());
+    }
 
     void GCommandList::SetViewports(const D3D12_VIEWPORT* viewports, const size_t count) const
     {
@@ -285,6 +431,28 @@ namespace PEPEngine::Graphics
     {
         assert(count < D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE);
         cmdList->RSSetScissorRects(count, scissorRects);
+    }
+
+    void GCommandList::SetComputeRootSignature(const GRootSignature& rs)
+    {
+        const auto d3d12RootSignature = rs.GetNativeSignature();
+        if (cachedRootSignature != d3d12RootSignature)
+        {
+            cachedRootSignature = d3d12RootSignature;
+            cmdList->SetComputeRootSignature(cachedRootSignature.Get());            
+            TrackResource(cachedRootSignature);
+        }
+    }
+
+    void GCommandList::SetGraphicsRootSignature(const GRootSignature& rs)
+    {
+        const auto d3d12RootSignature = rs.GetNativeSignature();
+        if (cachedRootSignature != d3d12RootSignature)
+        {
+            cachedRootSignature = d3d12RootSignature;
+            cmdList->SetGraphicsRootSignature(cachedRootSignature.Get());            
+            TrackResource(cachedRootSignature);
+        }
     }
 
     void GCommandList::SetRootSignature(const GRootSignature& rs)
