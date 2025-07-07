@@ -468,7 +468,7 @@ void HybridSSAOApp::InitDevices()
 
     const auto firstDevice = allDevices[0];
     const auto otherDevice = allDevices[1];
-
+    
     primeDevice = firstDevice;
     secondDevice = otherDevice;
 
@@ -476,6 +476,19 @@ void HybridSSAOApp::InitDevices()
     {
         primeDevice = otherDevice;
         secondDevice = firstDevice;
+    }
+    else
+    {
+        if (firstDevice->GetDesc().DedicatedVideoMemory > otherDevice->GetDesc().DedicatedVideoMemory)
+        {
+            primeDevice = firstDevice;
+            secondDevice = otherDevice;
+        }
+        else
+        {
+            primeDevice = otherDevice;
+            secondDevice = firstDevice;
+        }
     }
 
     assets = std::make_shared<AssetsLoader>(primeDevice);
