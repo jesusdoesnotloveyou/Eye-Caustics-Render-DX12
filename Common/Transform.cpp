@@ -129,6 +129,10 @@ void Transform::SetLocalMatrix(const Matrix& mat)
 {
     world = mat;
     world.Decompose(localScale, localRotate, localPosition);
+    auto euler = localRotate.ToEuler();
+    localEulerAngles.x = DirectX::XMConvertToDegrees(euler.x);
+    localEulerAngles.y = DirectX::XMConvertToDegrees(euler.y);
+    localEulerAngles.z = DirectX::XMConvertToDegrees(euler.z);
     NumFramesDirty = globalCountFrameResources;
 }
 

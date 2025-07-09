@@ -46,16 +46,6 @@ void HybridSSAOApp::ResetCamera() const
         Rotater->SetLocalMatrix(RotaterSaveMatrix);
     }
     CamTrans->SetLocalMatrix(CameraSaveMatrix);
-
-    /*
-    if (auto* Rotater = CamTrans->GetParent())
-    {
-        Rotater->SetPosition(Vector3::Forward * 325 + Vector3::Left * 625);
-        Rotater->SetEulerRotate(Vector3(0, -90, 90));
-    }
-    CamTrans->SetPosition(Vector3(-1000, 190, -32));
-    CamTrans->SetEulerRotate(Vector3(-30, 270, 0));
-     */
 }
 
 void HybridSSAOApp::Update(const GameTimer& gt)
