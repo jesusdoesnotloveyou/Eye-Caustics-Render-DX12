@@ -18,7 +18,7 @@
 #include "Window.h"
 #include "Services/States/WaitState.h"
 
-HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance)
+HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance), debugLogger(FileQueueWriter(std::filesystem::current_path() / "log.txt"))
 {
     mSceneBounds.Center = Vector3(0.0f, 0.0f, 0.0f);
     mSceneBounds.Radius = 200;
@@ -36,6 +36,26 @@ void HybridSSAOApp::ChangeAOMethod()
 {
     Flush();
     IsUseHBAO = !IsUseHBAO;
+}
+
+void HybridSSAOApp::ResetCamera() const
+{
+    auto& CamTrans = camera->gameObject->GetTransform();
+    if (auto* Rotater = CamTrans->GetParent())
+    {
+        Rotater->SetLocalMatrix(RotaterSaveMatrix);
+    }
+    CamTrans->SetLocalMatrix(CameraSaveMatrix);
+
+    /*
+    if (auto* Rotater = CamTrans->GetParent())
+    {
+        Rotater->SetPosition(Vector3::Forward * 325 + Vector3::Left * 625);
+        Rotater->SetEulerRotate(Vector3(0, -90, 90));
+    }
+    CamTrans->SetPosition(Vector3(-1000, 190, -32));
+    CamTrans->SetEulerRotate(Vector3(-30, 270, 0));
+     */
 }
 
 void HybridSSAOApp::Update(const GameTimer& gt)
@@ -385,6 +405,7 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
     currentFrameResourceIndex = MainWindow->Present();
 }
 
+
 bool HybridSSAOApp::Initialize()
 {
     InitDevices();
@@ -411,54 +432,87 @@ bool HybridSSAOApp::Initialize()
 #if !defined(DEBUG) && !defined(_DEBUG)
     TestTime = 120;
 #endif
-    logs.PushMessage(L"\nNative Implementation SSAO");
 
-    benchmark.AddState<WaitState>(TestTime, [this]()
-                                  {
-                                      logs.PushMessage(L"\nHybrid Implementation SSAO");
-                                      SwitchDevice();
-                                  }, [this](const TimeStats& ts, float progress)
-                                  {
-                                      Benchmark::PrintStats(ts, &logs);
-                                      MainWindow->SetWindowTitle(L"Native Implementation SSAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
-                                  });
-    
-    benchmark.AddState<WaitState>(TestTime, [this]()
-                                  {
-                                        logs.PushMessage(L"\nNative Implementation HBAO");
-                                        SwitchDevice();
-                                        ChangeAOMethod();
-                                  }, [this](const TimeStats& ts, float progress)
-                                  {
-                                      Benchmark::PrintStats(ts, &logs);
-                                      MainWindow->SetWindowTitle(L"Hybrid Implementation SSAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
-                                  });
 
-    benchmark.AddState<WaitState>(TestTime, [this]()
-                                  {
-                                        logs.PushMessage(L"\nHybrid Implementation HBAO");
-                                        SwitchDevice();
-                                  }, [this](const TimeStats& ts, float progress)
-                                  {
-                                      Benchmark::PrintStats(ts, &logs);
-                                      MainWindow->SetWindowTitle(L"Native Implementation HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
-                                  });
+    auto& NativeSSAOState = benchmark.AddState<WaitState>(TestTime, FileQueueWriter(Benchmark::GetLogFile(L"Native SSAO ", *primeDevice, *secondDevice)));
+    NativeSSAOState.OnEnter = [](FileQueueWriter& logs)
+    {
+        logs.PushMessage(L"FPS;MSPF;MinFPS;MinMSPF;MaxFPS;MaxMSPF");
+    };
 
-    benchmark.AddState<WaitState>(TestTime, [this]()
-                                  {
-                                        logs.PushMessage(L"\nDone");
-                                        Flush();
-                                        IsStop = true;
-                                  }, [this](const TimeStats& ts, float progress)
-                                  {
-                                      Benchmark::PrintStats(ts, &logs);
-                                      MainWindow->SetWindowTitle(L"Hybrid Implementation HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
-                                  });
-    
+    NativeSSAOState.OnStatChanged = [this](FileQueueWriter& logs, const TimeStats& ts, float progress)
+    {
+        Benchmark::PrintStatsCSV(ts, logs);
+        MainWindow->SetWindowTitle(L"Native SSAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
+    };
+
+    NativeSSAOState.OnExit = [this](FileQueueWriter& logs)
+    {
+        logs.WriteAllLog();
+        Flush();
+    };
+
+    auto& HybridSSAOState = benchmark.AddState<WaitState>(TestTime, FileQueueWriter(Benchmark::GetLogFile(L"Hybrid SSAO ", *primeDevice, *secondDevice)));
+    HybridSSAOState.OnEnter = [this](FileQueueWriter& logs)
+    {
+        ResetCamera();
+        SwitchDevice();
+        logs.PushMessage(L"FPS;MSPF;MinFPS;MinMSPF;MaxFPS;MaxMSPF");
+    };
+    HybridSSAOState.OnStatChanged = [this](FileQueueWriter& logs, const TimeStats& ts, float progress)
+    {
+        Benchmark::PrintStatsCSV(ts, logs);
+        MainWindow->SetWindowTitle(L"Hybrid SSAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
+    };
+    HybridSSAOState.OnExit = [this](FileQueueWriter& logs)
+    {
+        logs.WriteAllLog();
+        Flush();
+        SwitchDevice();
+    };
+
+
+    auto& NativeHBAOState = benchmark.AddState<WaitState>(TestTime, FileQueueWriter(Benchmark::GetLogFile(L"Native HBAO ", *primeDevice, *secondDevice)));
+    NativeHBAOState.OnEnter = [this](FileQueueWriter& logs)
+    {
+        ResetCamera();
+        logs.PushMessage(L"FPS;MSPF;MinFPS;MinMSPF;MaxFPS;MaxMSPF");
+    };
+    NativeHBAOState.OnStatChanged = [this](FileQueueWriter& logs, const TimeStats& ts, float progress)
+    {
+        Benchmark::PrintStatsCSV(ts, logs);
+        MainWindow->SetWindowTitle(L"Native HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
+    };
+    NativeHBAOState.OnExit = [this](FileQueueWriter& logs)
+    {
+        logs.WriteAllLog();
+        Flush();
+    };
+
+    auto& HybridHBAOState = benchmark.AddState<WaitState>(TestTime, FileQueueWriter(Benchmark::GetLogFile(L"Hybrid HBAO ", *primeDevice, *secondDevice)));
+    HybridHBAOState.OnEnter = [this](FileQueueWriter& logs)
+    {
+        ResetCamera();
+        logs.PushMessage(L"FPS;MSPF;MinFPS;MinMSPF;MaxFPS;MaxMSPF");
+        SwitchDevice();
+    };
+    HybridHBAOState.OnStatChanged = [this](FileQueueWriter& logs, const TimeStats& ts, float progress)
+    {
+        Benchmark::PrintStatsCSV(ts, logs);
+        MainWindow->SetWindowTitle(L"Hybrid Implementation HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
+    };
+    HybridHBAOState.OnExit = [this](FileQueueWriter& logs)
+    {
+        logs.WriteAllLog();
+        SwitchDevice();
+        Flush();
+        IsStop = true;
+    };
+
+
 #if !defined(DEBUG) && !defined(_DEBUG)
     benchmark.Start();
 #endif
-    benchmark.Start();
     return true;
 }
 
@@ -468,11 +522,11 @@ void HybridSSAOApp::InitDevices()
 
     const auto firstDevice = allDevices[0];
     const auto otherDevice = allDevices[1];
-    
+
     primeDevice = firstDevice;
     secondDevice = otherDevice;
 
-    if (otherDevice->GetName().find(L"NVIDIA") != std::wstring::npos)
+    if (firstDevice->GetName().find(L"NVIDIA") == std::wstring::npos && otherDevice->GetName().find(L"NVIDIA") != std::wstring::npos)
     {
         primeDevice = otherDevice;
         secondDevice = firstDevice;
@@ -499,12 +553,12 @@ void HybridSSAOApp::InitDevices()
     }
 
 
-    logs.PushMessage(L"\nPrime Device: " + (primeDevice->GetName()));
-    logs.PushMessage(
+    debugLogger.PushMessage(L"\nPrime Device: " + (primeDevice->GetName()));
+    debugLogger.PushMessage(
         L"\t\n Cross Adapter Texture Support: " + std::to_wstring(
             primeDevice->IsCrossAdapterTextureSupported()));
-    logs.PushMessage(L"\nSecond Device: " + (secondDevice->GetName()));
-    logs.PushMessage(
+    debugLogger.PushMessage(L"\nSecond Device: " + (secondDevice->GetName()));
+    debugLogger.PushMessage(
         L"\t\n Cross Adapter Texture Support: " + std::to_wstring(
             secondDevice->IsCrossAdapterTextureSupported()));
 }
@@ -515,7 +569,7 @@ void HybridSSAOApp::InitFrameResource()
     {
         frameResources.emplace_back(std::make_unique<FrameResource>(primeDevice, secondDevice, 2, assets->GetMaterials().size()));
     }
-    logs.PushMessage(std::wstring(L"\nInit FrameResource "));
+    debugLogger.PushMessage(std::wstring(L"\nInit FrameResource "));
 }
 
 void HybridSSAOApp::InitRootSignature()
@@ -541,7 +595,7 @@ void HybridSSAOApp::InitRootSignature()
 
     primeDeviceSignature = rootSignature;
 
-    logs.PushMessage(std::wstring(L"\nInit RootSignature for " + primeDevice->GetName()));
+    debugLogger.PushMessage(std::wstring(L"\nInit RootSignature for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::InitPipeLineResource()
@@ -574,7 +628,7 @@ void HybridSSAOApp::InitPipeLineResource()
                                                  BackBufferFormat, DXGI_FORMAT_D32_FLOAT, nullptr,
                                                  NormalMapFormat, AmbientMapFormat);
 
-    logs.PushMessage(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
+    debugLogger.PushMessage(std::wstring(L"\nInit PSO for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::CreateMaterials()
@@ -593,7 +647,7 @@ void HybridSSAOApp::CreateMaterials()
 
     models[L"quad"]->SetMeshMaterial(0, assets->GetMaterial(assets->GetMaterialIndex(L"seamless")));
 
-    logs.PushMessage(std::wstring(L"\nCreate Materials"));
+    debugLogger.PushMessage(std::wstring(L"\nCreate Materials"));
 }
 
 void HybridSSAOApp::InitSRVMemoryAndMaterials()
@@ -610,7 +664,7 @@ void HybridSSAOApp::InitSRVMemoryAndMaterials()
         material->InitMaterial(&srvTexturesMemory);
     }
 
-    logs.PushMessage(std::wstring(L"\nInit Views for " + primeDevice->GetName()));
+    debugLogger.PushMessage(std::wstring(L"\nInit Views for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::InitRenderPaths()
@@ -645,7 +699,7 @@ void HybridSSAOApp::InitRenderPaths()
     commandQueue->WaitForFenceValue(commandQueue->ExecuteCommandList(cmdList));
     commandQueue->Flush();
 
-    logs.PushMessage(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
+    debugLogger.PushMessage(std::wstring(L"\nInit Render path data for " + primeDevice->GetName()));
 }
 
 void HybridSSAOApp::LoadStudyTexture()
@@ -714,7 +768,7 @@ void HybridSSAOApp::LoadStudyTexture()
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
     Flush();
-    logs.PushMessage(std::wstring(L"\nLoad DDS Texture"));
+    debugLogger.PushMessage(std::wstring(L"\nLoad DDS Texture"));
 }
 
 void HybridSSAOApp::LoadModels()
@@ -771,7 +825,7 @@ void HybridSSAOApp::LoadModels()
 
     queue->WaitForFenceValue(queue->ExecuteCommandList(cmdList));
     Flush();
-    logs.PushMessage(std::wstring(L"\nLoad Models Data"));
+    debugLogger.PushMessage(std::wstring(L"\nLoad Models Data"));
 }
 
 void HybridSSAOApp::MipMasGenerate()
@@ -800,29 +854,29 @@ void HybridSSAOApp::MipMasGenerate()
             auto computeList = computeQueue->GetCommandList();
             GTexture::GenerateMipMaps(computeList, generatedMipTextures.data(), generatedMipTextures.size());
             computeQueue->WaitForFenceValue(computeQueue->ExecuteCommandList(computeList));
-            logs.PushMessage(std::wstring(L"\nMip Map Generation for " + primeDevice->GetName()));
+            debugLogger.PushMessage(std::wstring(L"\nMip Map Generation for " + primeDevice->GetName()));
 
             computeList = computeQueue->GetCommandList();
             for (auto&& texture : generatedMipTextures)
                 computeList->TransitionBarrier(texture->GetD3D12Resource(), D3D12_RESOURCE_STATE_COMMON);
             computeList->FlushResourceBarriers();
-            logs.PushMessage(std::wstring(L"\nTexture Barrier Generation for " + primeDevice->GetName()));
+            debugLogger.PushMessage(std::wstring(L"\nTexture Barrier Generation for " + primeDevice->GetName()));
             computeQueue->WaitForFenceValue(computeQueue->ExecuteCommandList(computeList));
             computeQueue->Flush();
-            logs.PushMessage(std::wstring(L"\nMipMap Generation cmd list executing " + primeDevice->GetName()));
+            debugLogger.PushMessage(std::wstring(L"\nMipMap Generation cmd list executing " + primeDevice->GetName()));
             for (auto&& pair : textures)
                 pair->ClearTrack();
-            logs.PushMessage(std::wstring(L"\nFinish Mip Map Generation for " + primeDevice->GetName()));
+            debugLogger.PushMessage(std::wstring(L"\nFinish Mip Map Generation for " + primeDevice->GetName()));
         }
     }
     catch (DxException& e)
     {
-        logs.PushMessage(L"\n" + e.Filename + L" " + e.FunctionName + L" " + std::to_wstring(e.LineNumber));
+        debugLogger.PushMessage(L"\n" + e.Filename + L" " + e.FunctionName + L" " + std::to_wstring(e.LineNumber));
         MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
     }
     catch (...)
     {
-        logs.PushMessage(L"\nWTF???? How It Fix");
+        debugLogger.PushMessage(L"\nWTF???? How It Fix");
     }
 }
 
@@ -846,7 +900,7 @@ void HybridSSAOApp::SortGO()
 
 void HybridSSAOApp::CreateGO()
 {
-    logs.PushMessage(std::wstring(L"\nStart Create GO"));
+    debugLogger.PushMessage(std::wstring(L"\nStart Create GO"));
     auto skySphere = std::make_unique<GameObject>("Sky");
     skySphere->GetTransform()->SetScale({500, 500, 500});
     {
@@ -940,12 +994,14 @@ void HybridSSAOApp::CreateGO()
     rotater->GetTransform()->SetParent(platform->GetTransform().get());
     rotater->GetTransform()->SetPosition(Vector3::Forward * 325 + Vector3::Left * 625);
     rotater->GetTransform()->SetEulerRotate(Vector3(0, -90, 90));
+    RotaterSaveMatrix = rotater->GetTransform()->GetLocalMatrix();
 
     auto camera = std::make_unique<GameObject>("MainCamera");
-    camera->GetTransform()->SetParent(rotater->GetTransform().get());
-    camera->GetTransform()->SetEulerRotate(Vector3(-30, 270, 0));
+    camera->GetTransform()->SetParent(rotater->GetTransform().get());    
     camera->GetTransform()->SetPosition(Vector3(-1000, 190, -32));
+    camera->GetTransform()->SetEulerRotate(Vector3(-30, 270, 0));
     camera->AddComponent(std::make_shared<Camera>(AspectRatio()));
+    CameraSaveMatrix = camera->GetTransform()->GetLocalMatrix();
 
 #if defined(DEBUG) || defined(_DEBUG)
     camera->AddComponent(std::make_shared<CameraController>());
@@ -1025,15 +1081,12 @@ void HybridSSAOApp::CreateGO()
     typedRenderer[static_cast<int>(RenderMode::OpaqueAlphaDrop)].push_back(renderer);
     gameObjects.push_back(std::move(griffon));
 
-    logs.PushMessage(std::wstring(L"\nFinish create GO"));
+    debugLogger.PushMessage(std::wstring(L"\nFinish create GO"));
 }
 
 void HybridSSAOApp::OnApplicationExit()
 {
-    const std::filesystem::path filePath(
-        L"HybridAO " + primeDevice->GetName() + L"+" + secondDevice->GetName() + L".log");
-    const auto path = std::filesystem::current_path().wstring() + L"\\" + filePath.wstring();
-    logs.WriteAllLog(path);
+    debugLogger.WriteAllLog();
 }
 
 int HybridSSAOApp::Run()
@@ -1260,11 +1313,10 @@ void HybridSSAOApp::UpdateSsaoCB(const GameTimer& gt) const
         currentFrameResource->SecondSsaoConstantUploadBuffer->CopyData(0, ssaoCB);
     }
     {
-        
         HBAOConstants hbaoCB;
         hbaoCB.ProjMatrix = mainPassCB.Proj;
         hbaoCB.InvProjMatrix = mainPassCB.InvProj;
-        hbaoCB.ClipInfo = Vector2(1.0f / std::tan(XMConvertToRadians(camera->GetFov()) / 2.0f ));
+        hbaoCB.ClipInfo = Vector2(1.0f / std::tan(XMConvertToRadians(camera->GetFov()) / 2.0f));
         hbaoCB.MaxRadiusPixels = 64;
         hbaoCB.TraceRadius = 2.0f;
         hbaoCB.Resolution = Vector4(MainWindow->GetClientWidth(), MainWindow->GetClientHeight(),
@@ -1280,7 +1332,7 @@ bool HybridSSAOApp::InitMainWindow()
 {
     MainWindow = CreateRenderWindow(primeDevice, mainWindowCaption, 1920, 1080, false);
 
-    logs.PushMessage(std::wstring(L"\nInit Window"));
+    debugLogger.PushMessage(std::wstring(L"\nInit Window"));
     return true;
 }
 
@@ -1378,6 +1430,12 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
             {
                 IsUseHBAO = !IsUseHBAO;
                 Flush();
+            }
+
+            if (keycode == (VK_F9) && keyboard.KeyIsPressed(VK_F9))
+            {
+                Flush();
+                ResetCamera();
             }
 #endif
 

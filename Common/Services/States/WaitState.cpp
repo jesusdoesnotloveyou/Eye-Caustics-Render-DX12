@@ -4,7 +4,19 @@
 void WaitState::OnStatsCalculated(const TimeStats& stats)
 {
     currentStatsCalculation++;
-    OnStatChanged(stats, (float) currentStatsCalculation/waitTime);
+    OnStatChanged(this->fileQueueWriter, stats, static_cast<float>(currentStatsCalculation) / waitTime);
+}
+
+void WaitState::Enter()
+{
+    BenchmarkState::Enter();
+    OnEnter(fileQueueWriter);
+}
+
+void WaitState::Exit()
+{
+    BenchmarkState::Exit();
+    OnExit(fileQueueWriter);
 }
 
 bool WaitState::IsCompleted()

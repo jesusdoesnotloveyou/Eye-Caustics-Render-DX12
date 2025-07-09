@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <../Common/Services/FileQueueWriter.h>
 
 
 struct TimeStats
@@ -20,8 +21,12 @@ class BenchmarkState
 {
     TimeStats stats;
 
+protected:
+    FileQueueWriter fileQueueWriter;
+
 public:
     virtual ~BenchmarkState() = default;
+
 
     virtual void Enter()
     {
@@ -52,7 +57,7 @@ protected:
     {
     }
 
-    BenchmarkState(float timePerStep = 1.0f) : stats(), timeElapsed(0), timePerStatCalculation(timePerStep)
+    BenchmarkState(const FileQueueWriter& writer, float timePerStep = 1.0f): stats(), fileQueueWriter(writer), timeElapsed(0), timePerStatCalculation(timePerStep)
     {
     }
 

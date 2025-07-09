@@ -2,12 +2,15 @@
 #include "LockThreadQueue.h"
 #include <filesystem>
 
-class LogService
+class FileQueueWriter
 {
     PEPEngine::Utils::LockThreadQueue<std::wstring> queue;
 
+    std::filesystem::path filePath;
 public:
+    FileQueueWriter(std::filesystem::path filePath): filePath(std::move(filePath)) {  }
+    
     void PushMessage(const std::wstring& message);
 
-    bool WriteAllLog(const std::filesystem::path& filePath);
+    bool WriteAllLog();
 };

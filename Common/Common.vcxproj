@@ -205,7 +205,7 @@
     <ClInclude Include="Services\BenchmarkService.h" />
     <ClInclude Include="Services\States\BenchmarkState.h" />
     <ClInclude Include="Services\States\WaitState.h" />
-    <ClInclude Include="Services\LogService.h" />
+    <ClInclude Include="Services\FileQueueWriter.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="ShaderBuffersData.h" />
     <ClInclude Include="RenderModeFactory.h" />
@@ -250,7 +250,7 @@
     <ClCompile Include="RenderModeFactory.cpp" />
     <ClCompile Include="Services\BenchmarkService.cpp" />
     <ClCompile Include="Services\States\WaitState.cpp" />
-    <ClCompile Include="Services\LogService.cpp" />
+    <ClCompile Include="Services\FileQueueWriter.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="SkyBox.cpp" />
     <ClCompile Include="SplineController.cpp" />

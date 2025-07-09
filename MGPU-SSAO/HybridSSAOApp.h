@@ -11,8 +11,9 @@
 #include "GDeviceFactory.h"
 #include "Light.h"
 #include "SharedHBAO.h"
+#include "Transform.h"
 #include "UILayer.h"
-#include "Services/LogService.h"
+#include "Services/FileQueueWriter.h"
 #include "Services/BenchmarkService.h"
 
 class HybridSSAOApp final :
@@ -30,7 +31,7 @@ public:
     void SetBlurPassCount(const USHORT blurCount) { this->blurCount = blurCount; }
     void SwitchDevice();
     void ChangeAOMethod();
-
+    void ResetCamera() const;
 protected:
     void Update(const GameTimer& gt) override;
     void PopulateShadowMapCommands(const std::shared_ptr<GCommandList>& cmdList);;
@@ -70,7 +71,8 @@ protected:
     void Flush() override;
     LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) override;
 
-    LogService logs;
+    
+    FileQueueWriter debugLogger;
     BenchmarkService benchmark;
     std::shared_ptr<GDevice> primeDevice;
     std::shared_ptr<GDevice> secondDevice;
@@ -140,4 +142,6 @@ protected:
 
     DirectX::BoundingSphere mSceneBounds;
     int blurCount = 3;
+    Matrix RotaterSaveMatrix;
+    Matrix CameraSaveMatrix;
 };

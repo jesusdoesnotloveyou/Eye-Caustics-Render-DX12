@@ -6,28 +6,26 @@
 #include "Utils.h"
 
 
-class LogService;
+class FileQueueWriter;
 
-class WaitState final : public virtual BenchmarkState
+class WaitState final : public BenchmarkState
 {
 public:
-    WaitState(uint32_t timeInSeconds, const std::function<void()>& OnCompleted, const std::function<void(const TimeStats&, double)>& OnStatChanged) : BenchmarkState(), OnCompleted(OnCompleted), OnStatChanged(OnStatChanged),
-                                                                                                                                              waitTime(timeInSeconds)
+    WaitState(uint32_t timeInSeconds, const FileQueueWriter& writer, float timePerStep = 1.0f) : BenchmarkState(writer, timePerStep), waitTime(timeInSeconds)
     {
     }
+
+    std::function<void(FileQueueWriter&)> OnEnter;
+    std::function<void(FileQueueWriter&)> OnExit;
+    std::function<void(FileQueueWriter&, const TimeStats&, float)> OnStatChanged;
 
 private:
     void OnStatsCalculated(const TimeStats& stats) override;
 
-    void Exit() override
-    {
-        BenchmarkState::Exit();
-        OnCompleted();
-    }
+    void Enter() override;
 
-    std::function<void()> OnCompleted;
-    std::function<void(const TimeStats&, float)> OnStatChanged;
-
+    void Exit() override;
+    
     bool IsCompleted() override;
     uint32_t waitTime;
     uint32_t currentStatsCalculation = 0;

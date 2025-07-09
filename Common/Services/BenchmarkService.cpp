@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "BenchmarkService.h"
-#include "LogService.h"
+#include "FileQueueWriter.h"
 
 
 void BenchmarkService::SetState(BenchmarkState* state)
