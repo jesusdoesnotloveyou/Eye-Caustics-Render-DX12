@@ -21,7 +21,7 @@ void BenchmarkService::Start()
     currentStateIndex = 0;
     if (!states.empty())
     {
-        CurrentState = states[currentStateIndex].get();
+        SetState(states[currentStateIndex].get());
     }
 }
 
