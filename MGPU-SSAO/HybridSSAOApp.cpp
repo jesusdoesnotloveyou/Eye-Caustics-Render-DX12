@@ -529,22 +529,25 @@ void HybridSSAOApp::InitDevices()
     primeDevice = firstDevice;
     secondDevice = otherDevice;
 
-    if (firstDevice->GetName().find(L"NVIDIA") == std::wstring::npos && otherDevice->GetName().find(L"NVIDIA") != std::wstring::npos)
+    if (firstDevice->GetName().find(L"NVIDIA") == std::string::npos)
     {
-        primeDevice = otherDevice;
-        secondDevice = firstDevice;
-    }
-    else
-    {
-        if (firstDevice->GetDesc().DedicatedVideoMemory > otherDevice->GetDesc().DedicatedVideoMemory)
-        {
-            primeDevice = firstDevice;
-            secondDevice = otherDevice;
-        }
-        else
+        if (otherDevice->GetName().find(L"NVIDIA") != std::wstring::npos)
         {
             primeDevice = otherDevice;
             secondDevice = firstDevice;
+        }
+        else
+        {
+            if (firstDevice->GetDesc().DedicatedVideoMemory > otherDevice->GetDesc().DedicatedVideoMemory)
+            {
+                primeDevice = firstDevice;
+                secondDevice = otherDevice;
+            }
+            else
+            {
+                primeDevice = otherDevice;
+                secondDevice = firstDevice;
+            }
         }
     }
 
