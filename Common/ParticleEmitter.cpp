@@ -253,14 +253,14 @@ void ParticleEmitter::Draw(const std::shared_ptr<GCommandList>& cmdList)
     cmdList->SetGraphicsRootConstantBufferView(ParticleRenderSlot::ObjectData, *objectPositionBuffer.get());
 
     cmdList->SetGraphicsRoot32BitConstants(ParticleRenderSlot::EmitterData, sizeof(EmitterData) / sizeof(float), &emitterData,
-                                   0);
+                                           0);
 
     cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::ParticlesPool, &particlesRenderDescriptors, 0);
 
     cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::ParticlesAliveIndex, &particlesRenderDescriptors, 1);
 
     cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::Atlas, &particlesRenderDescriptors, 2);
-    
+
     cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
     cmdList->SetIBuffer();
     cmdList->SetVBuffer();
@@ -288,17 +288,7 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
     cmdList->FlushResourceBarriers();
 
     cmdList->SetDescriptorsHeap(&particlesComputeDescriptors);
-
-    cmdList->SetComputeRootSignature(*computeSignature);
-    cmdList->SetPipelineState(*injectedPSO.get());
     
-    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
-                                    ParticleComputeSlot::ParticlesPool - 1);
-    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
-                                    ParticleComputeSlot::ParticleDead - 1);
-    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleAlive, &particlesComputeDescriptors,
-                                    ParticleComputeSlot::ParticleAlive - 1);
-
     if (emitterData.ParticlesTotalCount > emitterData.ParticlesAliveCount)
     {
         if (emitterData.ParticlesAliveCount + emitterData.ParticleInjectCount <= emitterData.ParticlesTotalCount)
@@ -316,11 +306,21 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
 
             cmdList->SetPipelineState(*injectedPSO.get());
 
-            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleInjection, &particlesComputeDescriptors,
-                                            ParticleComputeSlot::ParticleInjection - 1);
 
             cmdList->SetComputeRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
-                                           &emitterData, 0);
+                                                  &emitterData, 0);
+
+
+            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
+                                                   ParticleComputeSlot::ParticlesPool - 1);
+            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
+                                                   ParticleComputeSlot::ParticleDead - 1);
+            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleAlive, &particlesComputeDescriptors,
+                                                   ParticleComputeSlot::ParticleAlive - 1);
+
+            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleInjection, &particlesComputeDescriptors,
+                                                   ParticleComputeSlot::ParticleInjection - 1);
+
 
             cmdList->Dispatch(emitterData.InjectedGroupCount, emitterData.InjectedGroupCount, 1);
 
@@ -333,14 +333,23 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
     {
         emitterData.SimulatedGroupCount = CalculateGroupCount(emitterData.ParticlesAliveCount);
 
-        cmdList->SetComputeRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
-                                       &emitterData, 0);
-
         cmdList->SetPipelineState(*simulatedPSO.get());
+
+        cmdList->SetComputeRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
+                                              &emitterData, 0);
+        cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
+                                               ParticleComputeSlot::ParticlesPool - 1);
+        cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
+                                               ParticleComputeSlot::ParticleDead - 1);
+        cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleAlive, &particlesComputeDescriptors,
+                                               ParticleComputeSlot::ParticleAlive - 1);
+        cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleInjection, &particlesComputeDescriptors,
+                                               ParticleComputeSlot::ParticleInjection - 1);
 
 
         cmdList->Dispatch(emitterData.SimulatedGroupCount, emitterData.SimulatedGroupCount, 1);
     }
+
 
     ParticlesAlive->CopyCounterForRead(cmdList);
 
