@@ -10,6 +10,7 @@
 #include "GCrossAdapterResource.h"
 #include "GDeviceFactory.h"
 #include "Light.h"
+#include "ParticleEmitter.h"
 #include "SharedHBAO.h"
 #include "Transform.h"
 #include "UILayer.h"
@@ -47,7 +48,7 @@ protected:
                                      const GraphicPSO& pso) const;
     void PopulateDebugCommands(const std::shared_ptr<GCommandList>& cmdList);
     void Draw(const GameTimer& gt) override;
-
+   
     void InitDevices();
     void InitFrameResource();
     void InitRootSignature();
@@ -144,4 +145,5 @@ protected:
     int blurCount = 3;
     Matrix RotaterSaveMatrix;
     Matrix CameraSaveMatrix;
+    std::vector<ParticleEmitter*> emitters;
 };

@@ -59,6 +59,8 @@ namespace PEPEngine::Graphics
 
         ComPtr<ID3D12Fence> GetFence() const;
 
+        const std::shared_ptr<GDevice>& GetDevice() const { return device; }
+
     private:
         friend class GDevice;
         friend class GCommandList;

@@ -246,19 +246,20 @@ void ParticleEmitter::Draw(const std::shared_ptr<GCommandList>& cmdList)
     cmdList->TransitionBarrier(ParticlesAlive->GetD3D12Resource(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     cmdList->FlushResourceBarriers();
 
+    cmdList->SetGraphicsRootSignature(*renderSignature);
     cmdList->SetPipelineState(*renderPSO.get());
     cmdList->SetDescriptorsHeap(&particlesRenderDescriptors);
 
-    cmdList->SetRootConstantBufferView(ParticleRenderSlot::ObjectData, *objectPositionBuffer.get());
+    cmdList->SetGraphicsRootConstantBufferView(ParticleRenderSlot::ObjectData, *objectPositionBuffer.get());
 
-    cmdList->SetRoot32BitConstants(ParticleRenderSlot::EmitterData, sizeof(EmitterData) / sizeof(float), &emitterData,
+    cmdList->SetGraphicsRoot32BitConstants(ParticleRenderSlot::EmitterData, sizeof(EmitterData) / sizeof(float), &emitterData,
                                    0);
 
-    cmdList->SetRootDescriptorTable(ParticleRenderSlot::ParticlesPool, &particlesRenderDescriptors, 0);
+    cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::ParticlesPool, &particlesRenderDescriptors, 0);
 
-    cmdList->SetRootDescriptorTable(ParticleRenderSlot::ParticlesAliveIndex, &particlesRenderDescriptors, 1);
+    cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::ParticlesAliveIndex, &particlesRenderDescriptors, 1);
 
-    cmdList->SetRootDescriptorTable(ParticleRenderSlot::Atlas, &particlesRenderDescriptors, 2);
+    cmdList->SetGraphicsRootDescriptorTable(ParticleRenderSlot::Atlas, &particlesRenderDescriptors, 2);
     
     cmdList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
     cmdList->SetIBuffer();
@@ -288,13 +289,14 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
 
     cmdList->SetDescriptorsHeap(&particlesComputeDescriptors);
 
+    cmdList->SetComputeRootSignature(*computeSignature);
     cmdList->SetPipelineState(*injectedPSO.get());
     
-    cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
+    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticlesPool, &particlesComputeDescriptors,
                                     ParticleComputeSlot::ParticlesPool - 1);
-    cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
+    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleDead, &particlesComputeDescriptors,
                                     ParticleComputeSlot::ParticleDead - 1);
-    cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticleAlive, &particlesComputeDescriptors,
+    cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleAlive, &particlesComputeDescriptors,
                                     ParticleComputeSlot::ParticleAlive - 1);
 
     if (emitterData.ParticlesTotalCount > emitterData.ParticlesAliveCount)
@@ -314,10 +316,10 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
 
             cmdList->SetPipelineState(*injectedPSO.get());
 
-            cmdList->SetRootDescriptorTable(ParticleComputeSlot::ParticleInjection, &particlesComputeDescriptors,
+            cmdList->SetComputeRootDescriptorTable(ParticleComputeSlot::ParticleInjection, &particlesComputeDescriptors,
                                             ParticleComputeSlot::ParticleInjection - 1);
 
-            cmdList->SetRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
+            cmdList->SetComputeRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
                                            &emitterData, 0);
 
             cmdList->Dispatch(emitterData.InjectedGroupCount, emitterData.InjectedGroupCount, 1);
@@ -331,7 +333,7 @@ void ParticleEmitter::Dispatch(const std::shared_ptr<GCommandList>& cmdList)
     {
         emitterData.SimulatedGroupCount = CalculateGroupCount(emitterData.ParticlesAliveCount);
 
-        cmdList->SetRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
+        cmdList->SetComputeRoot32BitConstants(ParticleComputeSlot::EmitterData, sizeof(EmitterData) / sizeof(float),
                                        &emitterData, 0);
 
         cmdList->SetPipelineState(*simulatedPSO.get());

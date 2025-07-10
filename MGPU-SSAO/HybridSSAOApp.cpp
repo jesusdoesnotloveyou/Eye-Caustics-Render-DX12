@@ -298,6 +298,11 @@ void HybridSSAOApp::PopulateForwardPathCommands(const std::shared_ptr<GCommandLi
         cmdList->SetPipelineState(*defaultPrimePipelineResources.GetPSO(RenderMode::Transparent));
         PopulateDrawCommands(cmdList, (RenderMode::Transparent));
 
+        cmdList->
+           SetGraphicsRootConstantBufferView(StandardShaderSlot::CameraData,
+                                     *currentFrameResource->PrimePassConstantUploadBuffer);
+        PopulateDrawCommands(cmdList, (RenderMode::Particle));
+
 
         cmdList->TransitionBarrier(antiAliasingPrimePath->GetRenderTarget(),
                                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -331,10 +336,12 @@ void HybridSSAOApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>
 void HybridSSAOApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
                                                 const GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
                                                 const GraphicPSO& pso) const
-{
-    cmdList->SetRootDescriptorTable(StandardShaderSlot::AmbientMap, renderTextureSRVMemory, renderTextureMemoryOffset);
-
+{    
     cmdList->SetPipelineState(pso);
+    
+    cmdList->SetDescriptorsHeap(renderTextureSRVMemory);
+    cmdList->SetGraphicsRootDescriptorTable(StandardShaderSlot::AmbientMap, renderTextureSRVMemory, renderTextureMemoryOffset);
+
     PopulateDrawCommands(cmdList, (RenderMode::Quad));
 }
 
@@ -373,6 +380,12 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
     auto primeRenderQueue = primeDevice->GetCommandQueue();
     auto primeCmdList = primeRenderQueue->GetCommandList();
     primeCmdList->EndQuery(timestampHeapIndex);
+
+    for (auto emitter : emitters)
+    {
+        emitter->Dispatch(primeCmdList);
+    }
+    
     PopulateNormalMapCommands(primeCmdList);
     PopulateAmbientMapCommands(primeCmdList);
     PopulateShadowMapCommands(primeCmdList);
@@ -489,7 +502,7 @@ bool HybridSSAOApp::Initialize()
     HybridHBAOState.OnStatChanged = [this](FileQueueWriter& logs, const TimeStats& ts, float progress)
     {
         Benchmark::PrintStatsCSV(ts, logs);
-        MainWindow->SetWindowTitle(L"Hybrid Implementation HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
+        MainWindow->SetWindowTitle(L"Hybrid HBAO Progress " + std::format(L"{:.2f}", progress * 100) + L"% FPS:" + std::to_wstring(ts.fps));
     };
     HybridHBAOState.OnExit = [this](FileQueueWriter& logs)
     {
@@ -969,6 +982,14 @@ void HybridSSAOApp::CreateGO()
             gameObjects.push_back(std::move(pbody));
         }
     }
+
+    auto particle = std::make_unique<GameObject>();
+    particle->GetTransform()->SetPosition(Vector3::Up);
+    const auto emitter = std::make_shared<ParticleEmitter>(primeDevice, 10000);
+    particle->AddComponent(emitter);
+    typedRenderer[static_cast<int>(RenderMode::Particle)].push_back(emitter);
+    emitters.push_back(emitter.get());
+    gameObjects.push_back(std::move(particle));
 
 
     auto platform = std::make_unique<GameObject>();
