@@ -18,7 +18,7 @@
 #include "Window.h"
 #include "Services/States/WaitState.h"
 
-HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance): D3DApp(hInstance), debugLogger(FileQueueWriter(std::filesystem::current_path() / "log.txt"))
+HybridSSAOApp::HybridSSAOApp(const HINSTANCE hInstance) : D3DApp(hInstance), debugLogger(FileQueueWriter(std::filesystem::current_path() / "log.txt"))
 {
     mSceneBounds.Center = Vector3(0.0f, 0.0f, 0.0f);
     mSceneBounds.Radius = 200;
@@ -299,8 +299,8 @@ void HybridSSAOApp::PopulateForwardPathCommands(const std::shared_ptr<GCommandLi
         PopulateDrawCommands(cmdList, (RenderMode::Transparent));
 
         cmdList->
-           SetGraphicsRootConstantBufferView(StandardShaderSlot::CameraData,
-                                     *currentFrameResource->PrimePassConstantUploadBuffer);
+            SetGraphicsRootConstantBufferView(StandardShaderSlot::CameraData,
+                                              *currentFrameResource->PrimePassConstantUploadBuffer);
         PopulateDrawCommands(cmdList, (RenderMode::Particle));
 
 
@@ -336,9 +336,9 @@ void HybridSSAOApp::PopulateInitRenderTarget(const std::shared_ptr<GCommandList>
 void HybridSSAOApp::PopulateDrawFullQuadTexture(const std::shared_ptr<GCommandList>& cmdList,
                                                 const GDescriptor* renderTextureSRVMemory, const UINT renderTextureMemoryOffset,
                                                 const GraphicPSO& pso) const
-{    
+{
     cmdList->SetPipelineState(pso);
-    
+
     cmdList->SetDescriptorsHeap(renderTextureSRVMemory);
     cmdList->SetGraphicsRootDescriptorTable(StandardShaderSlot::AmbientMap, renderTextureSRVMemory, renderTextureMemoryOffset);
 
@@ -375,17 +375,14 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
 {
     if (isResizing) return;
 
-    const UINT timestampHeapIndex = 2 * currentFrameResourceIndex;
-
     auto primeRenderQueue = primeDevice->GetCommandQueue();
     auto primeCmdList = primeRenderQueue->GetCommandList();
-    primeCmdList->EndQuery(timestampHeapIndex);
 
     for (auto emitter : emitters)
     {
         emitter->Dispatch(primeCmdList);
     }
-    
+
     PopulateNormalMapCommands(primeCmdList);
     PopulateAmbientMapCommands(primeCmdList);
     PopulateShadowMapCommands(primeCmdList);
@@ -401,8 +398,6 @@ void HybridSSAOApp::Draw(const GameTimer& gt)
 
     primeCmdList->TransitionBarrier(MainWindow->GetCurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
     primeCmdList->FlushResourceBarriers();
-    primeCmdList->EndQuery(timestampHeapIndex + 1);
-    primeCmdList->ResolveQuery(timestampHeapIndex, 2, timestampHeapIndex * sizeof(UINT64));
     currentFrameResource->PrimeRenderFenceValue = primeRenderQueue->ExecuteCommandList(primeCmdList);
 
     currentFrameResourceIndex = MainWindow->Present();
@@ -694,7 +689,7 @@ void HybridSSAOApp::InitRenderPaths()
     hbaoPass->Initialize(primeDevice, secondDevice, layoutDesc, MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
     hbaoPass->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
 
-    antiAliasingPrimePath = (std::make_shared<SSAA>(primeDevice, 6, MainWindow->GetClientWidth(),
+    antiAliasingPrimePath = (std::make_shared<SSAA>(primeDevice, 1, MainWindow->GetClientWidth(),
                                                     MainWindow->GetClientHeight(), DXGI_FORMAT_D32_FLOAT));
     antiAliasingPrimePath->OnResize(MainWindow->GetClientWidth(), MainWindow->GetClientHeight());
 
@@ -1011,7 +1006,7 @@ void HybridSSAOApp::CreateGO()
     RotaterSaveMatrix = rotater->GetTransform()->GetLocalMatrix();
 
     auto camera = std::make_unique<GameObject>("MainCamera");
-    camera->GetTransform()->SetParent(rotater->GetTransform().get());    
+    camera->GetTransform()->SetParent(rotater->GetTransform().get());
     camera->GetTransform()->SetPosition(Vector3(-1000, 190, -32));
     camera->GetTransform()->SetEulerRotate(Vector3(-30, 270, 0));
     camera->AddComponent(std::make_shared<Camera>(AspectRatio()));
@@ -1403,15 +1398,102 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
 {
     UIPath->MsgProc(hwnd, msg, wParam, lParam);
 
+#if defined(DEBUG) || defined(_DEBUG)
     switch (msg)
     {
+    case WM_INPUT:
+        {
+            UINT dataSize;
+            GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, nullptr, &dataSize,
+                            sizeof(RAWINPUTHEADER));
+            //Need to populate data size first
+
+            if (dataSize > 0)
+            {
+                auto rawdata = std::make_unique<BYTE[]>(dataSize);
+                if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, rawdata.get(), &dataSize,
+                                    sizeof(RAWINPUTHEADER)) == dataSize)
+                {
+                    auto raw = reinterpret_cast<RAWINPUT*>(rawdata.get());
+                    if (raw->header.dwType == RIM_TYPEMOUSE)
+                    {
+                        mouse.OnMouseMoveRaw(raw->data.mouse.lLastX, raw->data.mouse.lLastY);
+                    }
+                }
+            }
+
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+        }
+    //Mouse Messages
+    case WM_MOUSEMOVE:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnMouseMove(x, y);
+            return 0;
+        }
+    case WM_LBUTTONDOWN:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnLeftPressed(x, y);
+            return 0;
+        }
+    case WM_RBUTTONDOWN:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnRightPressed(x, y);
+            return 0;
+        }
+    case WM_MBUTTONDOWN:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnMiddlePressed(x, y);
+            return 0;
+        }
+    case WM_LBUTTONUP:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnLeftReleased(x, y);
+            return 0;
+        }
+    case WM_RBUTTONUP:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnRightReleased(x, y);
+            return 0;
+        }
+    case WM_MBUTTONUP:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            mouse.OnMiddleReleased(x, y);
+            return 0;
+        }
+    case WM_MOUSEWHEEL:
+        {
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            if (GET_WHEEL_DELTA_WPARAM(wParam) > 0)
+            {
+                mouse.OnWheelUp(x, y);
+            }
+            else if (GET_WHEEL_DELTA_WPARAM(wParam) < 0)
+            {
+                mouse.OnWheelDown(x, y);
+            }
+            return 0;
+        }
     case WM_KEYUP:
         {
             auto keycode = static_cast<char>(wParam);
             keyboard.OnKeyReleased(keycode);
             return 0;
         }
-
     case WM_KEYDOWN:
         {
             auto keycode = static_cast<char>(wParam);
@@ -1456,6 +1538,6 @@ LRESULT HybridSSAOApp::MsgProc(const HWND hwnd, const UINT msg, const WPARAM wPa
             return 0;
         }
     }
-
+#endif
     return D3DApp::MsgProc(hwnd, msg, wParam, lParam);
 }
