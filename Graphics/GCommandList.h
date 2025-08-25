@@ -54,19 +54,17 @@ namespace PEPEngine::Graphics
 
         std::shared_ptr<GCommandQueue> queue;
 
-
-        static std::shared_ptr<GCommandList> Create(const std::shared_ptr<GCommandQueue>& queue,
-                                                    D3D12_COMMAND_LIST_TYPE type);
-
     public:
         GCommandList(const std::shared_ptr<GCommandQueue>& queue, D3D12_COMMAND_LIST_TYPE type);
         std::shared_ptr<GDevice>& GetDevice() const;
 
-        virtual ~GCommandList();
+        virtual ~GCommandList() = default;
+        void BeginQuery(ID3D12QueryHeap* QueryHeap, UINT index) const;
+        void EndQuery(ID3D12QueryHeap* QueryHeap, UINT index) const;
+        void ResolveQuery(ID3D12QueryHeap* QueryHeap, ID3D12Resource* TimeStampResource, UINT index, UINT quriesCount, UINT64 aligned) const;
         void BeginQuery(UINT index) const;
         void EndQuery(UINT index) const;
         void ResolveQuery(UINT index, UINT quriesCount, UINT64 aligned) const;
-        void ResolveSubresource(UINT index, UINT quriesCount, UINT64 aligned) const;
 
         D3D12_COMMAND_LIST_TYPE GetCommandListType() const;
 
@@ -115,7 +113,7 @@ namespace PEPEngine::Graphics
         void SetGraphicsRootSignature(const GRootSignature& rs);
 
         void SetRootSignature(const GRootSignature& rs);
-        
+
         void SetPipelineState(const GraphicPSO& pso);
 
         void SetPipelineState(const ComputePSO& pso);
